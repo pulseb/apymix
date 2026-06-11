@@ -119,8 +119,10 @@ async def _sync_registry(app: FastAPI) -> None:
 
     Called during lifespan (after init_db). Only active apps are mounted.
     """
-    # Workspace root = parent of the apymix/ project dir
-    workspace_root = Path(__file__).resolve().parent.parent.parent
+    # Workspace root resolved by discovery._find_workspace_root() :
+    # APYMIX_WORKSPACE env > scan CWD > mode monorepo > fallback CWD
+    from apymix.discovery import _find_workspace_root
+    workspace_root = _find_workspace_root()
 
     # Discover all projects via amx.yaml
     api_entries, front_entries = discover_projects(workspace_root)

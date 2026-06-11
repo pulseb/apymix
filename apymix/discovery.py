@@ -7,12 +7,54 @@ du workspace pour trouver ces fichiers et monte les projets correspondants.
 
 import importlib
 import logging
+import os
 from pathlib import Path
 
 import yaml
 from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
+
+
+def _find_workspace_root() -> Path:
+    """Détermine la racine du workspace Apymix.
+
+    Ordre de résolution :
+    1. Variable d'env ``APYMIX_WORKSPACE`` (chemin explicite)
+    2. Remonter depuis le CWD à la recherche d'un dossier contenant
+       au moins un fichier ``amx.yaml`` (max 5 niveaux)
+    3. Remonter depuis le module apymix (mode editable / monorepo)
+    4. CWD en dernier recours (échec attendu du discovery)
+
+    Returns:
+        Path absolu vers le workspace root.
+    """
+    # 1. Variable d'env (override explicite)
+    env_root = os.environ.get("APYMIX_WORKSPACE")
+    if env_root:
+        root = Path(env_root).expanduser().resolve()
+        if root.is_dir():
+            logger.debug("Workspace root from APYMIX_WORKSPACE: %s", root)
+            return root
+        logger.warning("APYMIX_WORKSPACE=%s introuvable, fallback", env_root)
+
+    # 2. Remonter depuis le CWD à la recherche d'amx.yaml
+    cwd = Path.cwd().resolve()
+    for parent in [cwd, *cwd.parents][:5]:
+        # Le workspace contient au moins un amx.yaml (lui-même ou un sous-dossier)
+        if (parent / "amx.yaml").is_file() or any((parent / p / "amx.yaml").is_file() for p in parent.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))):
+            logger.debug("Workspace root détecté depuis CWD: %s", parent)
+            return parent
+
+    # 3. Mode editable (apymix/ dans un monorepo)
+    legacy_root = Path(__file__).resolve().parent.parent.parent
+    if legacy_root.is_dir() and (legacy_root / "apymix").is_dir():
+        logger.debug("Workspace root (mode monorepo): %s", legacy_root)
+        return legacy_root
+
+    # 4. Dernier recours : CWD
+    logger.debug("Workspace root fallback CWD: %s", cwd)
+    return cwd
 
 
 def _load_amx(amx_path: Path) -> dict:
@@ -40,6 +82,43 @@ def _add_root_route(sub_app: FastAPI, config: dict, folder_name: str) -> None:
         return {"name": name, "version": version, "description": description}
 
 
+def _iter_project_dirs(workspace_root: Path) -> list[Path]:
+    """Liste les dossiers de projets à scanner dans un workspace.
+
+    Deux layouts supportés :
+    1. **Monorepo** : ``workspace/`` contient plusieurs sous-projets
+       (``workspace/eve-api/amx.yaml``, ``workspace/kif-api/amx.yaml``, …)
+    2. **Single project** : ``workspace/`` est lui-même un projet
+       (``workspace/amx.yaml``)
+
+    Sont ignorés :
+    - Les dossiers cachés/privés (``.foo``, ``_bar``)
+    - Le dossier ``apymix`` (le framework ne se monte pas)
+    - Les dossiers sans ``amx.yaml``
+    """
+    if not workspace_root.exists() or not workspace_root.is_dir():
+        return []
+
+    # Cas 1 : amx.yaml à la racine → le workspace est lui-même le projet
+    if (workspace_root / "amx.yaml").is_file():
+        return [workspace_root]
+
+    # Cas 2 : scanner les sous-dossiers directs
+    dirs: list[Path] = []
+    for project_dir in sorted(workspace_root.iterdir()):
+        if not project_dir.is_dir():
+            continue
+        if project_dir.name.startswith(".") or project_dir.name.startswith("_"):
+            continue
+        if project_dir.name == "apymix":
+            continue
+        if not (project_dir / "amx.yaml").is_file():
+            continue
+        dirs.append(project_dir)
+
+    return dirs
+
+
 def discover_projects(workspace_root: Path) -> tuple[list[tuple[str, FastAPI, dict]], list[tuple[str, Path, dict]]]:
     """Scanne le workspace pour tous les projets déclarés via amx.yaml.
 
@@ -60,17 +139,8 @@ def discover_projects(workspace_root: Path) -> tuple[list[tuple[str, FastAPI, di
         logger.warning("Workspace root introuvable : %s", workspace_root)
         return api_entries, front_entries
 
-    for project_dir in sorted(workspace_root.iterdir()):
-        if not project_dir.is_dir():
-            continue
-        if project_dir.name.startswith(".") or project_dir.name.startswith("_"):
-            continue
-        if project_dir.name == "apymix":
-            continue  # le framework lui-même
-
+    for project_dir in _iter_project_dirs(workspace_root):
         amx_path = project_dir / "amx.yaml"
-        if not amx_path.exists():
-            continue
 
         config = _load_amx(amx_path)
         if not config.get("enabled", True):
@@ -128,17 +198,8 @@ def discover_api_admin_views(workspace_root: Path) -> list:
 
     views: list[type[ModelView]] = []
 
-    for project_dir in sorted(workspace_root.iterdir()):
-        if not project_dir.is_dir() or project_dir.name.startswith((".", "_")):
-            continue
-        if project_dir.name == "apymix":
-            continue
-
-        amx_path = project_dir / "amx.yaml"
-        if not amx_path.exists():
-            continue
-
-        config = _load_amx(amx_path)
+    for project_dir in _iter_project_dirs(workspace_root):
+        config = _load_amx(project_dir / "amx.yaml")
         if config.get("type") != "api" or not config.get("enabled", True):
             continue
 
@@ -165,19 +226,10 @@ def import_all_api_models(workspace_root: Path | None = None) -> None:
     """
     if workspace_root is None:
         # Remonter depuis apymix/ jusqu'à la racine du workspace
-        workspace_root = Path(__file__).resolve().parent.parent.parent
+        workspace_root = _find_workspace_root()
 
-    for project_dir in sorted(workspace_root.iterdir()):
-        if not project_dir.is_dir() or project_dir.name.startswith((".", "_")):
-            continue
-        if project_dir.name == "apymix":
-            continue
-
-        amx_path = project_dir / "amx.yaml"
-        if not amx_path.exists():
-            continue
-
-        config = _load_amx(amx_path)
+    for project_dir in _iter_project_dirs(workspace_root):
+        config = _load_amx(project_dir / "amx.yaml")
         if config.get("type") != "api" or not config.get("enabled", True):
             continue
 
@@ -193,10 +245,10 @@ def import_all_api_models(workspace_root: Path | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Compatibilité — fonctions legacy (utilisées par les scripts lors de la transition)
+# Compatibilité — fonction legacy, conservée pour les scripts
 # ---------------------------------------------------------------------------
 
 def _get_workspace_root() -> Path:
-    """Déduit la racine du workspace depuis l'emplacement du module apymix."""
-    return Path(__file__).resolve().parent.parent.parent
+    """Déduit la racine du workspace (alias rétro-compatible de ``_find_workspace_root``)."""
+    return _find_workspace_root()
 
