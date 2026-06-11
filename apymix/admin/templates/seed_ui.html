@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seed Admin</title>
+    <style>
+        body { background:#0f172a; color:#e2e8f0; font-family:system-ui, -apple-system, sans-serif; margin:0; }
+        .wrap { max-width:780px; margin:40px auto; padding:0 20px; }
+        h1 { font-size:1.35rem; margin-bottom:8px; }
+        .sub { color:#94a3b8; margin-bottom:24px; }
+        .row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+        .seed-btn {
+            background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:8px;
+            padding:10px 14px; cursor:pointer; min-width:270px; text-align:left;
+        }
+        .seed-btn:hover { border-color:#38bdf8; }
+        .seed-btn:disabled { opacity:.6; cursor:not-allowed; }
+        .result { font-size:.9rem; color:#94a3b8; }
+        .ok { color:#22c55e; }
+        .warn { color:#f59e0b; }
+        .err { color:#ef4444; }
+        .empty { color:#64748b; font-style:italic; }
+        .links { margin-top:24px; }
+        .links a { color:#38bdf8; text-decoration:none; margin-right:14px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>🌱 Seed manuel des APIs</h1>
+        <div class="sub">Déclenche les seeds des applications métier depuis le backend admin.</div>
+        <div id="seed-list">
+            {% if apis %}
+                {% for api in apis %}
+                <div class="row">
+                    <button class="seed-btn" data-api="{{ api }}">🌱 Lancer le seed: {{ api }}</button>
+                    <span class="result" id="result-{{ api }}"></span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="empty">Aucune API seedable détectée.</p>
+            {% endif %}
+        </div>
+        <div class="links">
+            <a href="/-/padmin">← Retour admin</a>
+            <a href="/-/apps">Apps registry</a>
+        </div>
+    </div>
+    <script>
+        const buttons = document.querySelectorAll('.seed-btn');
+        for (const btn of buttons) {
+            btn.addEventListener('click', async () => {
+                const api = btn.dataset.api;
+                const resultEl = document.getElementById(`result-${api}`);
+                btn.disabled = true;
+                resultEl.className = 'result';
+                resultEl.textContent = 'Exécution...';
+                try {
+                    const resp = await fetch(`/-/admin/seed/${api}`, { method: 'POST', credentials: 'include' });
+                    const data = await resp.json();
+                    if (!resp.ok) {
+                        resultEl.classList.add('err');
+                        resultEl.textContent = data.detail || 'Erreur';
+                    } else if (data.seeded) {
+                        resultEl.classList.add('ok');
+                        resultEl.textContent = 'Données seedées';
+                    } else {
+                        resultEl.classList.add('warn');
+                        resultEl.textContent = data.message || 'Aucune donnée insérée';
+                    }
+                } catch (e) {
+                    resultEl.classList.add('err');
+                    resultEl.textContent = 'Erreur réseau';
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

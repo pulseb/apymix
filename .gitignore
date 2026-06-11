@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+.python-version
+
+# Environments
+.env
+.env.local
+.env.*.local
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Alembic
+apymix/alembic/versions/__pycache__/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Wrangler (Cloudflare — optionnel)
+.wrangler/
