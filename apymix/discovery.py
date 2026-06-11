@@ -20,11 +20,13 @@ def _find_workspace_root() -> Path:
     """Détermine la racine du workspace Apymix.
 
     Ordre de résolution :
-    1. Variable d'env ``APYMIX_WORKSPACE`` (chemin explicite)
-    2. Remonter depuis le CWD à la recherche d'un dossier contenant
-       au moins un fichier ``amx.yaml`` (max 5 niveaux)
-    3. Remonter depuis le module apymix (mode editable / monorepo)
-    4. CWD en dernier recours (échec attendu du discovery)
+    1. Variable d'env ``APYMIX_WORKSPACE`` (chemin explicite).
+       Si le chemin est invalide, on log un warning et on retombe sur CWD.
+    2. Sinon, le CWD (``Path.cwd()``).
+
+    Le scan des projets se fait ensuite dans les enfants directs
+    du workspace root (cf. ``_iter_project_dirs``) : pour chaque
+    sous-dossier ``<projet>/``, on cherche ``<projet>/amx.yaml``.
 
     Returns:
         Path absolu vers le workspace root.
@@ -36,24 +38,11 @@ def _find_workspace_root() -> Path:
         if root.is_dir():
             logger.debug("Workspace root from APYMIX_WORKSPACE: %s", root)
             return root
-        logger.warning("APYMIX_WORKSPACE=%s introuvable, fallback", env_root)
+        logger.warning("APYMIX_WORKSPACE=%s introuvable, fallback sur CWD", env_root)
 
-    # 2. Remonter depuis le CWD à la recherche d'amx.yaml
+    # 2. CWD par défaut
     cwd = Path.cwd().resolve()
-    for parent in [cwd, *cwd.parents][:5]:
-        # Le workspace contient au moins un amx.yaml (lui-même ou un sous-dossier)
-        if (parent / "amx.yaml").is_file() or any((parent / p / "amx.yaml").is_file() for p in parent.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))):
-            logger.debug("Workspace root détecté depuis CWD: %s", parent)
-            return parent
-
-    # 3. Mode editable (apymix/ dans un monorepo)
-    legacy_root = Path(__file__).resolve().parent.parent.parent
-    if legacy_root.is_dir() and (legacy_root / "apymix").is_dir():
-        logger.debug("Workspace root (mode monorepo): %s", legacy_root)
-        return legacy_root
-
-    # 4. Dernier recours : CWD
-    logger.debug("Workspace root fallback CWD: %s", cwd)
+    logger.debug("Workspace root = CWD: %s", cwd)
     return cwd
 
 

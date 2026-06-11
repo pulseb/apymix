@@ -53,43 +53,29 @@ class TestFindWorkspaceRoot:
         result = _find_workspace_root()
         assert isinstance(result, Path)
 
-    def test_finds_root_via_amx_at_cwd(self, tmp_path: Path, monkeypatch):
-        """Si amx.yaml est à la racine du CWD, on l'utilise."""
+    def test_finds_root_via_cwd_when_env_unset(self, tmp_path: Path, monkeypatch):
+        """Sans env var, le workspace root = CWD (peu importe le contenu)."""
         monkeypatch.delenv("APYMIX_WORKSPACE", raising=False)
-        (tmp_path / "amx.yaml").write_text("name: ws")
         monkeypatch.chdir(tmp_path)
         assert _find_workspace_root() == tmp_path
 
-    def test_finds_root_via_subproject_amx(self, tmp_path: Path, monkeypatch):
-        """Si CWD contient un sous-dossier avec amx.yaml, on remonte au CWD."""
+    def test_does_not_walk_up_parents(self, tmp_path: Path, monkeypatch):
+        """Aucune remontée : si le CWD est nested, on ne remonte pas chercher un amx.yaml parent."""
         monkeypatch.delenv("APYMIX_WORKSPACE", raising=False)
-        sub = tmp_path / "my-api"
-        sub.mkdir()
-        (sub / "amx.yaml").write_text("name: my-api")
-        monkeypatch.chdir(tmp_path)
-        assert _find_workspace_root() == tmp_path
-
-    def test_walks_up_from_cwd_to_find_amx(self, tmp_path: Path, monkeypatch):
-        """Si amx.yaml n'est pas au CWD mais dans un parent (max 5 niveaux), on remonte."""
-        monkeypatch.delenv("APYMIX_WORKSPACE", raising=False)
-        (tmp_path / "amx.yaml").write_text("name: ws")
-        nested = tmp_path / "a" / "b" / "c"
-        nested.mkdir(parents=True)
+        # Place un amx.yaml dans le parent
+        (tmp_path / "amx.yaml").write_text("name: parent")
+        # Mais on est dans un sous-dossier sans amx.yaml
+        nested = tmp_path / "sub"
+        nested.mkdir()
         monkeypatch.chdir(nested)
-        assert _find_workspace_root() == tmp_path
+        # On doit rester dans `nested`, pas remonter
+        assert _find_workspace_root() == nested
 
-    def test_walks_up_then_falls_back(self, tmp_path: Path, monkeypatch):
-        """Comportement de fallback : si la remontée ne trouve rien, on prend le CWD.
-
-        Note : on ne peut pas tester ce cas de manière isolée car la remontée
-        depuis n'importe quel CWD réel trouve souvent un amx.yaml (ex: pulsapps
-        à /workspace). On vérifie donc juste que la fonction retourne un Path,
-        et qu'on peut l'utiliser.
-        """
+    def test_returns_absolute_path(self, tmp_path: Path, monkeypatch):
+        """Le résultat est toujours un Path absolu, même si CWD est relatif."""
         monkeypatch.delenv("APYMIX_WORKSPACE", raising=False)
-        # Au minimum : la fonction ne lève pas et retourne un Path absolu
+        monkeypatch.chdir(tmp_path)
         result = _find_workspace_root()
-        assert isinstance(result, Path)
         assert result.is_absolute()
 
 
