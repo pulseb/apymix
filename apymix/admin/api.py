@@ -137,7 +137,7 @@ async def trigger_seed(
     available = _discover_seedable_apis()
     if api_name not in available:
         _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "failed", 
-                   f"API not seedable")
+                   "API not seedable")
         raise HTTPException(
             status_code=404,
             detail=f"API '{api_name}' n'a pas de seed disponible"
@@ -148,7 +148,7 @@ async def trigger_seed(
         if seeded:
             await db.commit()
             _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "success", 
-                       f"seed executed")
+                       "seed executed")
             logger.info("🌱 Seed '%s' déclenché via API admin par user %s", api_name, current_user.id)
             return {
                 "data": {
@@ -161,7 +161,7 @@ async def trigger_seed(
             }
         else:
             _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "noop", 
-                       f"data already present")
+                       "data already present")
             return {
                 "data": {
                     "api": api_name,

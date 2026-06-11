@@ -10,6 +10,7 @@ build/
 venv/
 env/
 .python-version
+uv.lock
 
 # Environments
 .env

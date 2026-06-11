@@ -5,12 +5,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pyfiglet
-import yaml
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.staticfiles import StaticFiles
 from starlette.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address

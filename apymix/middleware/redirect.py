@@ -14,7 +14,7 @@ import os
 import time
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 logger = logging.getLogger(__name__)

@@ -176,7 +176,6 @@ async def reset_and_seed() -> None:
     Utilisé quand FORCE_SEED=true au démarrage (option --seed en dev/CI).
     ⚠️  Toutes les données existantes sont supprimées.
     """
-    from apymix.db import init_db
     from apymix.db.session import _get_engine
     from sqlmodel import SQLModel
 

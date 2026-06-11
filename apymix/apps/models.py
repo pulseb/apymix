@@ -1,7 +1,7 @@
 """Modèle AppEntry — registre des applications découvertes par PulseApps."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 
 from sqlmodel import Field, SQLModel

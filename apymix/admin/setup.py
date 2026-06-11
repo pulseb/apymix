@@ -7,11 +7,10 @@ Les admin views des APIs métier sont découvertes automatiquement via amx.yaml.
 import logging
 import os
 import secrets
-from pathlib import Path
 
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqladmin import Admin, ModelView
+from sqladmin import Admin
 
 from apymix.admin.auth import AdminAuth
 from apymix.admin.views import AppEntryAdmin, UserAdmin, RedirectAdmin

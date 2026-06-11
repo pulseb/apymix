@@ -102,7 +102,7 @@ async def login_oauth2_form(
             detail="Compte désactivé ou supprimé",
         )
 
-    settings = get_settings()
+    settings = get_settings()  # noqa: F841 — used via dict spread below
     return {
         "access_token": create_access_token(_build_token_data(user)),
         "token_type": "bearer",

@@ -6,7 +6,6 @@ le registre déclenche automatiquement le seed de cette API (via
 """
 
 import logging
-from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select

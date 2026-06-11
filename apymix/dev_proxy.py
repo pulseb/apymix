@@ -11,7 +11,7 @@ Utilise :
 import asyncio
 import logging
 
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
 

@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlmodel import SQLModel, Field
-from uuid import UUID
 
 
 # Préfixe des tables système d'Apymix. Configurable via AMX_TABLE_PREFIX.
