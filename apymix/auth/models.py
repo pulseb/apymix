@@ -102,3 +102,11 @@ class LoginRequest(SQLModel):
 
     email: str
     password: str
+
+
+class RegisterRequest(SQLModel):
+    """Public registration request schema."""
+
+    email: str = Field(max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    display_name: Optional[str] = Field(default=None, max_length=100)

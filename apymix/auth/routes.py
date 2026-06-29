@@ -9,8 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from apymix.auth.jwt import create_access_token, create_refresh_token, decode_token
-from apymix.auth.models import LoginRequest, TokenRefreshRequest, TokenResponse, User, UserAccount, UserRead
-from apymix.auth.security import get_current_user, verify_password
+from apymix.auth.models import (
+    LoginRequest,
+    RegisterRequest,
+    TokenRefreshRequest,
+    TokenResponse,
+    User,
+    UserAccount,
+    UserRead,
+)
+from apymix.auth.security import get_current_user, get_password_hash, verify_password
 from apymix.config import get_settings
 from apymix.db.session import get_db
 
@@ -37,6 +45,39 @@ async def _get_user_read_with_api_token(user: User, db: AsyncSession) -> UserRea
     data = UserRead.model_validate(user, from_attributes=True)
     data.api_token = account.provider_user_id if account else None
     return data
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    """Public registration: create a user with a password account, then auto-login."""
+    email = body.email.strip().lower()
+
+    existing = await db.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        )
+
+    user = User(email=email, display_name=body.display_name, status="active")
+    db.add(user)
+    await db.flush()  # obtain user.id
+
+    account = UserAccount(
+        user_id=user.id,
+        provider="password",
+        provider_user_id=email,
+        password_hash=get_password_hash(body.password),
+    )
+    db.add(account)
+    await db.commit()
+
+    settings = get_settings()
+    return TokenResponse(
+        access_token=create_access_token(_build_token_data(user)),
+        refresh_token=create_refresh_token(_build_token_data(user)),
+        expires_in=settings.jwt_access_token_expire_minutes * 60,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
