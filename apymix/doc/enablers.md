@@ -1,123 +1,123 @@
-# Enablers techniques — PAPI
+# Technical Enablers — Apymix
 
 ---
 
-## ENB-01 : Scaffolding projet & environnement de développement
+## ENB-01 : Project Scaffolding & Development Environment
 
-**Type :** DevEx
-**Objectif :** Mettre en place la structure de fichiers, les dépendances et l'outillage de développement.
-**Dépendances :** Aucune
+**Type:** DevEx
+**Objective:** Set up the file structure, dependencies, and development tooling.
+**Dependencies:** None
 
-**Critères de done :**
-- [x] `pyproject.toml` configuré avec les dépendances (FastAPI, SQLAlchemy, Alembic, Pydantic, uvicorn, etc.)
-- [x] Groupe de dépendances `[dev]` (pytest, httpx, ruff, mypy)
-- [x] Structure de dossiers créée (`papi/`, `apis/`, `fronts/`, `tests/`, `alembic/`)
-- [ ] `.gitignore` configuré pour Python, Node.js, IDE, `.env`
-- [ ] `.env.example` avec les variables documentées
-
----
-
-## ENB-02 : Abstraction base de données multi-moteur
-
-**Type :** Infrastructure
-**Objectif :** Permettre l'utilisation de SQLite en développement et PostgreSQL en production avec le même code applicatif.
-**Dépendances :** ENB-01
-
-**Critères de done :**
-- [x] SQLAlchemy 2.0 async configuré avec session factory
-- [x] Moteur déterminé par la variable `DATABASE_URL`
-- [x] Dépendance FastAPI `get_db` injectant une session par requête
-- [x] Base model déclaratif avec `id`, `created_at`, `updated_at` automatiques
-- [ ] Tests passent sur SQLite (in-memory)
+**Done criteria:**
+- [x] `pyproject.toml` configured with dependencies (FastAPI, SQLAlchemy, Alembic, Pydantic, uvicorn, etc.)
+- [x] `[dev]` dependency group (pytest, httpx, ruff, mypy)
+- [x] Folder structure created (`apymix/`, `apis/`, `fronts/`, `tests/`, `alembic/`)
+- [ ] `.gitignore` configured for Python, Node.js, IDE, `.env`
+- [ ] `.env.example` with documented variables
 
 ---
 
-## ENB-03 : Authentification & autorisation JWT
+## ENB-02 : Multi-Engine Database Abstraction
 
-**Type :** Sécurité
-**Objectif :** Sécuriser les endpoints d'administration avec une authentification JWT et/ou un token statique.
-**Dépendances :** ENB-01, ENB-02
+**Type:** Infrastructure
+**Objective:** Allow SQLite in development and PostgreSQL in production with the same application code.
+**Dependencies:** ENB-01
 
-**Critères de done :**
-- [x] Modèle `User` avec email et mot de passe hashé
-- [x] Endpoints `/auth/login` et `/auth/refresh`
-- [x] Dépendance FastAPI `get_current_user` pour protéger les routes
-- [x] Hashage des mots de passe (bcrypt)
-- [x] Configuration JWT (secret, durée de vie) via variables d'environnement
-- [x] Gestion des rôles (au minimum : admin)
-- [x] Token statique (`api_token`) comme alternative au JWT pour intégrations simples
+**Done criteria:**
+- [x] SQLAlchemy 2.0 async configured with a session factory
+- [x] Engine determined by the `DATABASE_URL` variable
+- [x] FastAPI `get_db` dependency injecting a session per request
+- [x] Declarative base model with automatic `id`, `created_at`, `updated_at`
+- [ ] Tests pass on SQLite (in-memory)
 
 ---
 
-## ENB-04 : Conteneurisation Docker
+## ENB-03 : JWT Authentication & Authorization
 
-**Type :** Infrastructure
-**Objectif :** Produire une image Docker optimisée pour le déploiement.
-**Dépendances :** ENB-01
+**Type:** Security
+**Objective:** Secure administration endpoints with JWT authentication and/or a static token.
+**Dependencies:** ENB-01, ENB-02
 
-**Critères de done :**
-- [x] Dockerfile (multi-stage, python:3.14, uv builder + runtime slim)
-- [x] Image basée sur Python 3.14-slim
-- [x] Utilisateur non-root dans le conteneur
-- [ ] `docker-compose.yml` avec services `papi` + `db` (PostgreSQL)
-- [ ] Healthcheck configuré
-- [x] `.dockerignore` configuré
-
----
-
-## ENB-05 : Migrations de schéma Alembic
-
-**Type :** Infrastructure
-**Objectif :** Gérer les évolutions de schéma de base de données de manière versionnée.
-**Dépendances :** ENB-02
-
-**Critères de done :**
-- [ ] Alembic initialisé avec configuration async
-- [ ] `alembic.ini` et `env.py` configurés
-- [ ] Support SQLite et PostgreSQL
-- [ ] Commande `alembic revision --autogenerate` fonctionnelle
-- [ ] Migration initiale créée
+**Done criteria:**
+- [x] `User` model with email and hashed password
+- [x] `/auth/login` and `/auth/refresh` endpoints
+- [x] FastAPI `get_current_user` dependency to protect routes
+- [x] Password hashing (bcrypt)
+- [x] JWT configuration (secret, lifetime) via environment variables
+- [x] Role management (at minimum: admin)
+- [x] Static token (`api_token`) as an alternative to JWT for simple integrations
 
 ---
 
-## ENB-06 : Configuration centralisée
+## ENB-04 : Docker Containerization
 
-**Type :** DevEx
-**Objectif :** Centraliser la configuration de l'application via Pydantic Settings.
-**Dépendances :** ENB-01
+**Type:** Infrastructure
+**Objective:** Produce an optimized Docker image for deployment.
+**Dependencies:** ENB-01
 
-**Critères de done :**
-- [x] Classe `Settings` héritant de `BaseSettings` (Pydantic)
-- [x] Support fichier `.env` via `env_file`
-- [x] Variables : `ENV`, `DEBUG`, `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRATION`, `CORS_ORIGINS`
-- [x] Validation des valeurs au démarrage
-- [x] Singleton accessible dans toute l'application
-
----
-
-## ENB-07 : Observabilité minimale
-
-**Type :** Observabilité
-**Objectif :** Mettre en place un logging structuré et un endpoint de healthcheck.
-**Dépendances :** ENB-01
-
-**Critères de done :**
-- [ ] Logging structuré (JSON en prod, lisible en dev)
-- [ ] Log de chaque requête (méthode, path, status, durée)
-- [ ] Endpoint `GET /health` retournant le statut de l'app et de la BDD
-- [ ] Niveau de log configurable via variable d'environnement
+**Done criteria:**
+- [x] Dockerfile (multi-stage, python:3.14, uv builder + slim runtime)
+- [x] Image based on Python 3.14-slim
+- [x] Non-root user inside the container
+- [ ] `docker-compose.yml` with `apymix` + `db` (PostgreSQL) services
+- [ ] Healthcheck configured
+- [x] `.dockerignore` configured
 
 ---
 
-## ENB-08 : Tests & qualité de code
+## ENB-05 : Alembic Schema Migrations
 
-**Type :** DevEx
-**Objectif :** Mettre en place l'infrastructure de tests et les outils de qualité de code.
-**Dépendances :** ENB-01, ENB-02
+**Type:** Infrastructure
+**Objective:** Manage database schema evolutions in a versioned way.
+**Dependencies:** ENB-02
 
-**Critères de done :**
-- [ ] pytest configuré avec `pytest.ini` ou `pyproject.toml`
-- [ ] httpx `AsyncClient` configuré pour les tests d'API
-- [ ] Fixtures de test (app, client, db session in-memory)
-- [ ] Ruff configuré pour le linting
-- [ ] Au moins un test par endpoint du MVP
+**Done criteria:**
+- [ ] Alembic initialized with async configuration
+- [ ] `alembic.ini` and `env.py` configured
+- [ ] Support for SQLite and PostgreSQL
+- [ ] `alembic revision --autogenerate` working
+- [ ] Initial migration created
+
+---
+
+## ENB-06 : Centralized Configuration
+
+**Type:** DevEx
+**Objective:** Centralize application configuration via Pydantic Settings.
+**Dependencies:** ENB-01
+
+**Done criteria:**
+- [x] `Settings` class inheriting from `BaseSettings` (Pydantic)
+- [x] Support for `.env` file via `env_file`
+- [x] Variables: `ENV`, `DEBUG`, `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRATION`, `CORS_ORIGINS`
+- [x] Value validation at startup
+- [x] Singleton accessible across the application
+
+---
+
+## ENB-07 : Minimal Observability
+
+**Type:** Observability
+**Objective:** Set up structured logging and a healthcheck endpoint.
+**Dependencies:** ENB-01
+
+**Done criteria:**
+- [ ] Structured logging (JSON in prod, human-readable in dev)
+- [ ] Per-request log (method, path, status, duration)
+- [ ] `GET /health` endpoint returning the app and DB status
+- [ ] Log level configurable via environment variable
+
+---
+
+## ENB-08 : Testing & Code Quality
+
+**Type:** DevEx
+**Objective:** Set up the testing infrastructure and code quality tools.
+**Dependencies:** ENB-01, ENB-02
+
+**Done criteria:**
+- [ ] pytest configured via `pytest.ini` or `pyproject.toml`
+- [ ] httpx `AsyncClient` configured for API tests
+- [ ] Test fixtures (app, client, in-memory db session)
+- [ ] Ruff configured for linting
+- [ ] At least one test per MVP endpoint

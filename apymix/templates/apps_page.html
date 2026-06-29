@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -92,20 +92,20 @@
         <span class="subtitle">PulseApps v{{ version }}</span>
     </div>
     <div class="stats">
-        <div><span>{{ total }}</span> apps enregistrées</div>
-        <div><span>{{ active }}</span> actives</div>
+        <div><span>{{ total }}</span> registered apps</div>
+        <div><span>{{ active }}</span> active</div>
     </div>
     <table>
         <thead>
             <tr>
                 <th>Type</th>
-                <th>Nom</th>
+                <th>Name</th>
                 <th>Description</th>
                 <th>Version</th>
-                <th>Préfixe</th>
+                <th>Prefix</th>
                 <th>Status</th>
                 <th>Docs</th>
-                <th>Dernier scan</th>
+                <th>Last scan</th>
             </tr>
         </thead>
         <tbody>
@@ -123,6 +123,6 @@
             {% endfor %}
         </tbody>
     </table>
-    <a href="/-/" class="back">← Retour au dashboard</a>
+    <a href="/-/" class="back">← Back to dashboard</a>
 </body>
 </html>

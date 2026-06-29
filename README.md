@@ -46,7 +46,7 @@ cp .env.example .env
 
 ### 3. Lancement en mode standalone
 
-En standalone, Apymix sert sa home page (`/`) et l'admin (`/-/padmin`) :
+En standalone, Apymix sert sa home page (`/`) et l'admin (`/-/admx`) :
 
 ```bash
 uv run apymix --reload
@@ -54,7 +54,7 @@ uv run apymix --reload
 
 - App : http://localhost:8000
 - Docs OpenAPI : http://localhost:8000/-/docs
-- Admin : http://localhost:8000/-/padmin
+- Admin : http://localhost:8000/-/admx
 
 C'est utile pour développer le framework lui-même ou pour valider l'installation. Le seed admin se déclenche automatiquement si la DB est vide.
 
@@ -118,7 +118,57 @@ uv run apymix --reload
 
 Apymix scanne le répertoire parent, monte chaque `amx.yaml` actif, et synchronise le registre des apps en base. Au prochain démarrage, les apps sont reconnues automatiquement.
 
+> 💡 **Astuce — workspace root** : le scanner cherche les `amx.yaml` dans les sous-dossiers **directs** du workspace root. Si tes projets sont imbriqués (ex. `pulsapps/{eve-api,kif-api}/amx.yaml`), passe `APYMIX_WORKSPACE=/chemin/du/dossier parent`. Sinon, le CWD est utilisé.
+
 Pour plus de détails, voir [apymix/doc/architecture.md](apymix/doc/architecture.md).
+
+---
+
+## 🔗 Consommer Apymix dans un projet (mode dépendance Git)
+
+Apymix est conçu pour être installé comme **dépendance externe** dans un workspace applicatif (par ex. [`pulsapps`](https://github.com/pulseb/pulsapps)). Le projet consommateur n'importe pas Apymix comme sub-project : il le tire via Git (ou un path local en dev).
+
+### Déclaration `pyproject.toml` du projet consommateur
+
+```toml
+# pulsapps/pyproject.toml (extrait)
+[tool.uv.workspace]
+members = ["eve-api", "kif-api", "aeria-api"]   # les sub-projets métier
+
+[tool.uv.sources]
+# Prod-like : pin sur un tag Git
+# apymix = { git = "https://github.com/pulseb/apymix", tag = "v0.5.1" }
+# Dev local : pointer sur le repo sibling (éditable → hot-reload)
+apymix = { path = "../apymix", editable = true }
+```
+
+Chaque sub-projet (`*-api/pyproject.toml`) se contente de déclarer `apymix` dans ses `dependencies` — la source est héritée du root.
+
+### Workflow dev
+
+```bash
+# Layout sibling
+/workspace/
+├── pulsapps/         # projet applicatif
+└── apymix/           # ce repo (modifié en place, hot-reload via uvicorn --reload)
+
+# Côté pulsapps
+cd pulsapps
+uv sync --all-packages
+uv run uvicorn apymix.app:app --reload    # les modifs de ../apymix sont live
+```
+
+### Workflow release
+
+Pour bumper Apymix dans un projet consommateur :
+
+1. Tagger la release : `git tag v0.6.0 && git push origin v0.6.0` (côté `apymix/`)
+2. Mettre à jour la source dans le `pyproject.toml` consommateur : `apymix = { git = "...", tag = "v0.6.0" }`
+3. `rm uv.lock && uv sync` pour mettre à jour le lockfile
+
+### Isolation `apymix/` vs `*-api/`
+
+Le module `apymix/` ne doit **jamais** importer depuis un projet `*-api/` (pas de `from eve_api.xxx` dans `apymix/`). Si Apymix a besoin de contributions des APIs (ex : admin views SQLAdmin), il utilise l'auto-discovery via `amx.yaml` (champ `module: <module>`) plutôt qu'un import direct.
 
 ---
 

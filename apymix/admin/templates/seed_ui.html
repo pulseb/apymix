@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -27,22 +27,22 @@
 </head>
 <body>
     <div class="wrap">
-        <h1>🌱 Seed manuel des APIs</h1>
-        <div class="sub">Déclenche les seeds des applications métier depuis le backend admin.</div>
+        <h1>🌱 Manual API seed</h1>
+        <div class="sub">Triggers the seed of business applications from the admin backend.</div>
         <div id="seed-list">
             {% if apis %}
                 {% for api in apis %}
                 <div class="row">
-                    <button class="seed-btn" data-api="{{ api }}">🌱 Lancer le seed: {{ api }}</button>
+                    <button class="seed-btn" data-api="{{ api }}">🌱 Run seed: {{ api }}</button>
                     <span class="result" id="result-{{ api }}"></span>
                 </div>
                 {% endfor %}
             {% else %}
-                <p class="empty">Aucune API seedable détectée.</p>
+                <p class="empty">No seedable API detected.</p>
             {% endif %}
         </div>
         <div class="links">
-            <a href="/-/padmin">← Retour admin</a>
+            <a href="/-/admx">← Back to admin</a>
             <a href="/-/apps">Apps registry</a>
         </div>
     </div>
@@ -54,23 +54,23 @@
                 const resultEl = document.getElementById(`result-${api}`);
                 btn.disabled = true;
                 resultEl.className = 'result';
-                resultEl.textContent = 'Exécution...';
+                resultEl.textContent = 'Running...';
                 try {
                     const resp = await fetch(`/-/admin/seed/${api}`, { method: 'POST', credentials: 'include' });
                     const data = await resp.json();
                     if (!resp.ok) {
                         resultEl.classList.add('err');
-                        resultEl.textContent = data.detail || 'Erreur';
+                        resultEl.textContent = data.detail || 'Error';
                     } else if (data.seeded) {
                         resultEl.classList.add('ok');
-                        resultEl.textContent = 'Données seedées';
+                        resultEl.textContent = 'Data seeded';
                     } else {
                         resultEl.classList.add('warn');
-                        resultEl.textContent = data.message || 'Aucune donnée insérée';
+                        resultEl.textContent = data.message || 'No data inserted';
                     }
                 } catch (e) {
                     resultEl.classList.add('err');
-                    resultEl.textContent = 'Erreur réseau';
+                    resultEl.textContent = 'Network error';
                 } finally {
                     btn.disabled = false;
                 }

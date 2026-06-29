@@ -1,4 +1,4 @@
-"""Module d'authentification PAPI — JWT, modèle User, dépendances de sécurité."""
+"""Apymix authentication module — JWT, User model, security dependencies."""
 
 from apymix.auth.models import User
 from apymix.auth.security import get_current_user, get_password_hash, verify_password

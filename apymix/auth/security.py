@@ -1,4 +1,4 @@
-"""Sécurité — hash de mots de passe et dépendances d'authentification FastAPI."""
+"""Security — password hashing and FastAPI authentication dependencies."""
 
 import uuid
 
@@ -17,12 +17,12 @@ security_scheme = HTTPBearer()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Vérifie un mot de passe en clair contre un hash."""
+    """Verifies a plain-text password against a hash."""
     return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 
 def get_password_hash(password: str) -> str:
-    """Hashe un mot de passe."""
+    """Hashes a password."""
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
@@ -30,19 +30,19 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Dépendance FastAPI : extrait et vérifie l'utilisateur.
+    """FastAPI dependency: extracts and verifies the user.
 
-    Supporte deux modes d'authentification Bearer :
-    1. JWT classique (access token issu de /auth/login)
-    2. Token statique (UserAccount provider="api_token", pour intégrations simples)
+    Supports two Bearer authentication modes:
+    1. Standard JWT (access token from /auth/login)
+    2. Static token (UserAccount provider="api_token", for simple integrations)
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token invalide ou expiré",
+        detail="Invalid or expired token",
     )
     token = credentials.credentials
 
-    # --- Tentative 1 : JWT ---
+    # --- Attempt 1: JWT ---
     try:
         payload = decode_token(token)
         if payload.get("type") != "access":
@@ -55,9 +55,9 @@ async def get_current_user(
             return user
         raise credentials_exception
     except JWTError:
-        pass  # Ce n'est pas un JWT valide → on essaie le token statique
+        pass  # Not a valid JWT → try the static token
 
-    # --- Tentative 2 : api_token statique ---
+    # --- Attempt 2: static api_token ---
     result = await db.execute(
         select(UserAccount).where(
             UserAccount.provider == "api_token",

@@ -1,4 +1,4 @@
-"""Modèle User — identité et authentification partagées entre toutes les APIs."""
+"""User model — identity and authentication shared across all APIs."""
 
 import uuid
 from datetime import datetime
@@ -12,7 +12,7 @@ from apymix.db.models import TimestampMixin
 
 
 class UserBase(SQLModel):
-    """Champs d'identité communs (sans sa_column — utilisé par les schémas Pydantic)."""
+    """Common identity fields (no sa_column — used by Pydantic schemas)."""
 
     email: str = Field(max_length=255, unique=True, index=True)
     display_name: Optional[str] = Field(default=None, max_length=100)
@@ -24,13 +24,13 @@ class UserBase(SQLModel):
 
 
 class User(UserBase, TimestampMixin, table=True):
-    """Table des identités utilisateurs."""
+    """User identities table."""
 
     __tablename__ = "users"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
-    # Override JSON fields pour le stockage DB
+    # Override JSON fields for DB storage
     roles: List[str] = Field(default_factory=lambda: ["user"], sa_column=Column(JSON))
     profile: dict = Field(default_factory=dict, sa_column=Column(JSON))
 
@@ -48,9 +48,9 @@ class User(UserBase, TimestampMixin, table=True):
 
 
 class UserAccount(TimestampMixin, table=True):
-    """Méthode d'authentification liée à un utilisateur.
+    """Authentication method linked to a user.
 
-    Un utilisateur peut avoir plusieurs comptes : password, api_token, google…
+    A user can have several accounts: password, api_token, google, etc.
     """
 
     __tablename__ = "user_accounts"
@@ -58,16 +58,16 @@ class UserAccount(TimestampMixin, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     provider: str = Field(max_length=50, index=True)  # "password" | "api_token" | "google" | …
-    # Pour "password" : email. Pour "api_token" : le token. Pour OAuth : uid fournisseur.
+    # For "password": email. For "api_token": the token. For OAuth: provider uid.
     provider_user_id: Optional[str] = Field(default=None, max_length=255, index=True)
-    password_hash: Optional[str] = Field(default=None, max_length=255)  # uniquement provider="password"
-    meta: dict = Field(default_factory=dict, sa_column=Column(JSON))  # données spécifiques au provider
+    password_hash: Optional[str] = Field(default=None, max_length=255)  # only for provider="password"
+    meta: dict = Field(default_factory=dict, sa_column=Column(JSON))  # provider-specific data
 
     user: Optional[User] = Relationship(back_populates="accounts")
 
 
 class UserCreate(SQLModel):
-    """Schéma de création d'un utilisateur."""
+    """Schema for creating a user."""
 
     email: str
     password: str
@@ -76,14 +76,14 @@ class UserCreate(SQLModel):
 
 
 class UserRead(UserBase):
-    """Schéma de lecture d'un utilisateur (sans données sensibles)."""
+    """Read schema for a user (no sensitive data)."""
 
     id: uuid.UUID
-    api_token: Optional[str] = None  # renseigné si l'utilisateur a un compte api_token actif
+    api_token: Optional[str] = None  # populated if the user has an active api_token account
 
 
 class TokenResponse(SQLModel):
-    """Schéma de réponse d'authentification."""
+    """Authentication response schema."""
 
     access_token: str
     refresh_token: str
@@ -92,13 +92,13 @@ class TokenResponse(SQLModel):
 
 
 class TokenRefreshRequest(SQLModel):
-    """Schéma de requête de refresh."""
+    """Refresh request schema."""
 
     refresh_token: str
 
 
 class LoginRequest(SQLModel):
-    """Schéma de requête de login."""
+    """Login request schema."""
 
     email: str
     password: str

@@ -1,66 +1,66 @@
-# Vision — PAPI (Pluri API)
+# Vision — Apymix (API Python Mix)
 
 ## Pitch
 
-**PAPI (Pluri API)** est un socle technique Python permettant d'héberger plusieurs micro-APIs sous une même infrastructure. Il mutualise les préoccupations transverses (authentification, base de données, configuration, déploiement) pour qu'un développeur solo puisse déployer de nouvelles APIs métier sans friction.
+**Apymix (API Python Mix)** is a Python technical core that lets you host several micro-APIs under a single infrastructure. It pools cross-cutting concerns (authentication, database, configuration, deployment) so a solo developer can ship new business APIs with zero friction.
 
-## Problème
+## Problem
 
-Un développeur qui a besoin de plusieurs petites APIs (RSVP mariage, gestion perso, domotique…) doit à chaque fois :
+A developer who needs several small APIs (wedding RSVP, personal management, home automation...) currently has to, for each one:
 
-- Configurer un nouveau projet
-- Mettre en place l'authentification
-- Configurer la base de données et les migrations
-- Écrire un Dockerfile et un pipeline CI/CD
-- Gérer l'hébergement
+- Set up a new project
+- Wire up authentication
+- Configure the database and migrations
+- Write a Dockerfile and a CI/CD pipeline
+- Manage hosting
 
-**C'est un frein majeur** : la partie technique prend plus de temps que la logique métier elle-même.
+**This is a major blocker**: the technical scaffolding ends up taking more time than the business logic itself.
 
 ## Solution
 
-PAPI fournit :
+Apymix provides:
 
-1. **Un module technique réutilisable** (`papi/`) — auth, BDD, config, middleware — potentiellement open-sourceable
-2. **Un système de sub-apps** — chaque API métier est un dossier dans `apis/` avec sa propre doc OpenAPI
-3. **Un déploiement unique** — un seul conteneur Docker sert toutes les APIs
-4. **Une abstraction BDD** — SQLite en dev, PostgreSQL en prod, même code
+1. **A reusable technical module** (`apymix/`) — auth, DB, config, middleware — potentially open-sourceable
+2. **A sub-app system** — each business API lives in its own folder with its own OpenAPI doc
+3. **A single deployment** — one Docker container serves all APIs
+4. **A database abstraction** — SQLite in dev, PostgreSQL in prod, same code
 
 ## Personas
 
-### 👨‍💻 Développeur (persona principal de PAPI)
+### 👨‍💻 Developer (Apymix's primary persona)
 
-- **Profil :** Développeur solo ou petite équipe
-- **Besoin :** Déployer rapidement des micro-APIs sans overhead technique
-- **Interaction :** Crée des sub-apps dans `apis/`, utilise le module `papi/`
+- **Profile:** Solo developer or small team
+- **Need:** Ship micro-APIs quickly without technical overhead
+- **Interaction:** Creates sub-apps, uses the `apymix/` module
 
-### 🔧 Administrateur
+### 🔧 Administrator
 
-- **Profil :** Le développeur dans son rôle d'administrateur de la plateforme
-- **Besoin :** Gérer les utilisateurs, surveiller les APIs, contrôler les accès
-- **Interaction :** Interface d'administration, gestion des JWT, monitoring
+- **Profile:** The developer in their role as platform administrator
+- **Need:** Manage users, monitor APIs, control access
+- **Interaction:** Admin interface, JWT management, monitoring
 
-## Périmètre
+## Scope
 
-### Dans le périmètre
+### In scope
 
-- ✅ Module technique PAPI (app factory, auth JWT, abstraction BDD, config)
-- ✅ Système de montage de sub-apps avec OpenAPI par API
-- ✅ Auto-discovery des APIs (`apis/`) et des frontends (`fronts/`)
-- ✅ Registre d'applications (`papi_apps`)
-- ✅ Déploiement Docker
-- ✅ Back-office SQLAdmin
+- ✅ Apymix technical core (app factory, JWT auth, DB abstraction, config)
+- ✅ Sub-app mounting system with per-API OpenAPI
+- ✅ Auto-discovery of APIs and frontends via `amx.yaml`
+- ✅ Application registry (`amx_apps`)
+- ✅ Docker deployment
+- ✅ SQLAdmin back-office
 
-### Hors périmètre
+### Out of scope
 
-- ❌ Logique métier (chaque API dans `apis/` gère la sienne)
-- ❌ Frontends (chaque app dans `fronts/` est autonome)
+- ❌ Business logic (each API manages its own)
+- ❌ Frontends (each app is autonomous)
 - ❌ Multi-tenancy
-- ❌ CI/CD complet (sera fait post-MVP)
-- ❌ Monitoring / observabilité avancée
+- ❌ Full CI/CD (will be addressed post-MVP)
+- ❌ Advanced monitoring / observability
 
-## Valeurs directrices
+## Guiding values
 
-1. **Simplicité** — Un développeur doit pouvoir ajouter une API en < 30 minutes
-2. **Isolation** — Chaque API métier est indépendante, le module technique est réutilisable
-3. **Pragmatisme** — Pas d'over-engineering, on construit ce dont on a besoin
-4. **Sécurité** — Les données personnelles sont protégées dès le départ (auth, HTTPS, validation)
+1. **Simplicity** — A developer must be able to add an API in under 30 minutes
+2. **Isolation** — Each business API is independent; the technical core is reusable
+3. **Pragmatism** — No over-engineering; build only what we need
+4. **Security** — Personal data is protected from day one (auth, HTTPS, validation)

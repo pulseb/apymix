@@ -1,14 +1,14 @@
-"""Chargement et modélisation de la configuration amx.yaml des projets apymix.
+"""Loading and modeling of the amx.yaml configuration for apymix projects.
 
-Chaque projet (API ou frontend statique) embarque un fichier ``amx.yaml`` à sa
-racine. Ce module fournit :
+Each project (API or static frontend) ships an ``amx.yaml`` file at its root.
+This module provides:
 
-- ``AmxConfig`` : dataclass typée du contenu YAML.
-- ``load_amx_config(package_file)`` : charge ``amx.yaml`` depuis la racine du
-  projet contenant le fichier Python appelant.
-- ``make_tablename(prefix, name)`` : construit le nom de table DB préfixé.
+- ``AmxConfig``: typed dataclass for the YAML contents.
+- ``load_amx_config(package_file)``: loads ``amx.yaml`` from the root of the
+  project containing the calling Python file.
+- ``make_tablename(prefix, name)``: builds the prefixed DB table name.
 
-Usage dans un module API ::
+Usage in an API module::
 
     # eve_api/__init__.py
     from apymix.manifest import load_amx_config, make_tablename
@@ -37,51 +37,51 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AmxConfig:
-    """Configuration d'un projet apymix lue depuis amx.yaml."""
+    """Configuration of an apymix project read from amx.yaml."""
 
     name: str = ""
-    """Nom affiché du projet (ex: 'Eve-API', 'Eve')."""
+    """Display name of the project (e.g. 'Eve-API', 'Eve')."""
 
     route: str = "/"
-    """Préfixe de montage dans l'URL (ex: '/eve')."""
+    """Mount prefix in the URL (e.g. '/eve')."""
 
     type: Literal["api", "static"] = "api"
-    """Type de projet : 'api' (FastAPI sub-app) ou 'static' (SPA compilée)."""
+    """Project type: 'api' (FastAPI sub-app) or 'static' (built SPA)."""
 
     # --- API only ---
     module: str = ""
-    """Nom du module Python à importer (ex: 'eve_api'). Obligatoire pour type=api."""
+    """Python module name to import (e.g. 'eve_api'). Required for type=api."""
 
     table_prefix: str = ""
-    """Préfixe des tables SQL de ce projet (ex: 'eve_'). Convention : toujours avec _ final."""
+    """SQL table prefix for this project (e.g. 'eve_'). Convention: always ends with _."""
 
     # --- Static only ---
     dist_dir: str = "dist"
-    """Sous-dossier contenant le build statique (ex: 'dist', 'dist/pwa')."""
+    """Subfolder containing the static build (e.g. 'dist', 'dist/pwa')."""
 
-    # --- Commun ---
+    # --- Common ---
     version: str = "0.0.0"
     description: str = ""
     enabled: bool = True
 
-    # Chemin vers la racine du projet (rempli par load_amx_config)
+    # Path to the project root (populated by load_amx_config)
     project_dir: Path = field(default_factory=Path)
 
 
 def load_amx_config(package_file: str) -> AmxConfig:
-    """Charge amx.yaml depuis la racine du projet contenant ``package_file``.
+    """Load amx.yaml from the root of the project containing ``package_file``.
 
-    Remonte depuis le fichier appelant jusqu'à trouver ``amx.yaml``.
-    Si absent, retourne un AmxConfig vide (fail-safe).
+    Walks up from the calling file until ``amx.yaml`` is found.
+    If not found, returns an empty AmxConfig (fail-safe).
 
     Args:
-        package_file: ``__file__`` du module appelant (ex: ``eve_api/__init__.py``).
+        package_file: ``__file__`` of the calling module (e.g. ``eve_api/__init__.py``).
 
     Returns:
-        AmxConfig peuplé depuis le YAML, ou config vide si non trouvé.
+        AmxConfig populated from the YAML, or an empty config if not found.
     """
     start = Path(package_file).resolve().parent
-    # Chercher amx.yaml en remontant (max 3 niveaux au-dessus du module)
+    # Look for amx.yaml by walking up (max 3 levels above the module)
     candidate = start
     for _ in range(4):
         amx_path = candidate / "amx.yaml"
@@ -90,26 +90,26 @@ def load_amx_config(package_file: str) -> AmxConfig:
                 with open(amx_path) as f:
                     data = yaml.safe_load(f) or {}
                 config = AmxConfig(project_dir=candidate, **{k: v for k, v in data.items() if k in AmxConfig.__dataclass_fields__})
-                logger.debug("amx.yaml chargé depuis %s : %s", amx_path, config.name)
+                logger.debug("amx.yaml loaded from %s : %s", amx_path, config.name)
                 return config
             except Exception:
-                logger.exception("Erreur lecture amx.yaml : %s", amx_path)
+                logger.exception("Error reading amx.yaml: %s", amx_path)
                 return AmxConfig(project_dir=candidate)
         candidate = candidate.parent
 
-    logger.debug("amx.yaml introuvable depuis %s", start)
+    logger.debug("amx.yaml not found from %s", start)
     return AmxConfig(project_dir=start)
 
 
 def make_tablename(prefix: str, name: str) -> str:
-    """Construit le nom de table SQL préfixé.
+    """Build the prefixed SQL table name.
 
     Args:
-        prefix: Préfixe du projet (ex: 'eve_', 'kif_').
-        name: Nom court de la table (ex: 'events', 'rsvps').
+        prefix: Project prefix (e.g. 'eve_', 'kif_').
+        name: Short table name (e.g. 'events', 'rsvps').
 
     Returns:
-        Nom de table complet (ex: 'eve_events').
+        Full table name (e.g. 'eve_events').
 
     Example::
 

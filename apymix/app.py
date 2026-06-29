@@ -1,15 +1,14 @@
-"""App factory PulseApps — main entry point."""
+"""PulseApps app factory — main entry point."""
 
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import pyfiglet
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -30,7 +29,7 @@ from apymix.admin.api import router as admin_api_router
 from apymix.db.config_store import get_or_create_jwt_secret, get_verbose_errors
 
 # Prefix for all internal Apymix routes (admin, auth, docs, health…)
-PAPI_PREFIX = "/-"
+AMX_ROUTES_PREFIX = "/-"
 # Prefix for business APIs (e.g. /api/eve)
 API_PREFIX = "/api"
 
@@ -53,6 +52,11 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 DB_CONNECT_RETRIES = 30
 DB_CONNECT_DELAY = 2  # seconds
+
+# Cached HTML for the bare "/" page. Rendered once at startup; the route
+# handler just returns this string wrapped in an HTMLResponse — no DB call,
+# no template re-render, no per-request work. Minimizes the attack surface.
+_LANDING_HTML: str = ""
 
 
 async def _wait_for_db() -> None:
@@ -79,7 +83,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan: init DB, seed data, sync app registry."""
     settings = get_settings()
 
-    # Wait for DB to be ready (useful in pod: postgres may start in parallel)
+    # Wait for the database to be ready (useful in a pod: postgres may start in parallel)
     await _wait_for_db()
 
     # Import all API models so SQLModel.metadata knows every table before create_all
@@ -90,7 +94,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
 
-    # Load or generate JWT secret (env var > DB)
+    # Load or generate the JWT secret (env var > DB)
     async with AsyncSession(_get_engine(), expire_on_commit=False) as session:
         jwt_secret = await get_or_create_jwt_secret(session)
         verbose_errors = await get_verbose_errors(session)
@@ -105,7 +109,7 @@ async def lifespan(app: FastAPI):
         logger.warning("FORCE_SEED enabled — resetting database")
         await reset_and_seed()
     else:
-        # Auto-seed if database is empty
+        # Auto-seed if the database is empty
         await seed_initial_data()
 
     # Sync app registry
@@ -119,8 +123,8 @@ async def _sync_registry(app: FastAPI) -> None:
 
     Called during lifespan (after init_db). Only active apps are mounted.
     """
-    # Workspace root resolved by discovery._find_workspace_root() :
-    # APYMIX_WORKSPACE env > scan CWD > mode monorepo > fallback CWD
+    # Workspace root resolved by discovery._find_workspace_root():
+    # APYMIX_WORKSPACE env > CWD scan > monorepo mode > CWD fallback
     from apymix.discovery import _find_workspace_root
     workspace_root = _find_workspace_root()
 
@@ -193,24 +197,9 @@ async def _sync_registry(app: FastAPI) -> None:
             logger.debug("Frontend '%s' is active but dist/ not found — skipping", name)
 
 
-def _generate_ascii_art(text: str) -> str:
-    """Generate ASCII art from text."""
-    try:
-        return pyfiglet.figlet_format(text, font="ansi_shadow").strip()
-    except Exception as e:
-        logger.warning("ASCII art generation failed: %s. Using default font.", e)
-        try:
-            # Fallback to default font
-            return pyfiglet.figlet_format(text).strip()
-        except Exception as e2:
-            logger.error("ASCII art fallback failed: %s. Returning plain text.", e2)
-            return text
-
-
 def _build_root_page_data(name: str, version: str, description: str) -> dict:
-    """Build data for the home page."""
-    ascii_art = _generate_ascii_art(name)
-    return {"name": name, "version": version, "description": description, "ascii_art": ascii_art}
+    """Build data for the home page (used by both `/` and `/-/`)."""
+    return {"name": name, "version": version, "description": description}
 
 
 def _build_apps_page_data(apps: list, version: str) -> dict:
@@ -283,32 +272,32 @@ def create_app() -> FastAPI:
     project_root = Path(__file__).resolve().parent.parent
     workspace_root = project_root.parent
     pyproject_path = workspace_root / "pyproject.toml"
-    papi_name = "Apymix"
-    papi_version = "0.0.0"
-    papi_description = "API Python Mix"
-    
+    amx_name = "apymix"
+    amx_version = "0.0.0"
+    amx_description = "API Python Mix"
+
     if pyproject_path.exists():
         with open(pyproject_path, "rb") as f:
             pyproject = tomllib.load(f)
             project = pyproject.get("project", {})
-            papi_name = project.get("name", papi_name)
-            papi_version = project.get("version", papi_version)
-            papi_description = project.get("description", papi_description)
+            amx_name = project.get("name", amx_name)
+            amx_version = project.get("version", amx_version)
+            amx_description = project.get("description", amx_description)
 
-    logger.info("Starting %s v%s — %s", papi_name, papi_version, papi_description)
+    logger.info("Starting %s v%s — %s", amx_name, amx_version, amx_description)
 
     app = FastAPI(
-        title=papi_name,
-        description=papi_description,
-        version=papi_version,
+        title=amx_name,
+        description=amx_description,
+        version=amx_version,
         lifespan=lifespan,
-        docs_url=f"{PAPI_PREFIX}/docs",
-        openapi_url=f"{PAPI_PREFIX}/openapi.json",
-        redoc_url=f"{PAPI_PREFIX}/redoc",
-        swagger_ui_oauth2_redirect_url=f"{PAPI_PREFIX}/docs/oauth2-redirect",
+        docs_url=f"{AMX_ROUTES_PREFIX}/docs",
+        openapi_url=f"{AMX_ROUTES_PREFIX}/openapi.json",
+        redoc_url=f"{AMX_ROUTES_PREFIX}/redoc",
+        swagger_ui_oauth2_redirect_url=f"{AMX_ROUTES_PREFIX}/docs/oauth2-redirect",
     )
 
-    # Inject OAuth2 password flow in OpenAPI schema → bouton "Authorize" Swagger avec formulaire email/password
+    # Inject OAuth2 password flow into the OpenAPI schema → enables the "Authorize" button in Swagger UI with an email/password form
     _orig_openapi = app.openapi
 
     def _custom_openapi():
@@ -320,7 +309,7 @@ def create_app() -> FastAPI:
             "type": "oauth2",
             "flows": {
                 "password": {
-                    "tokenUrl": f"{PAPI_PREFIX}/auth/token",
+                    "tokenUrl": f"{AMX_ROUTES_PREFIX}/auth/token",
                     "scopes": {},
                 }
             },
@@ -330,14 +319,14 @@ def create_app() -> FastAPI:
     app.openapi = _custom_openapi
 
     # --- Middleware ---
-    # ProxyHeaders: trust X-Forwarded-* from local reverse proxy only
-    # Restricted to local IPs to prevent header spoofing
+    # ProxyHeaders: trust X-Forwarded-* from local reverse proxy only.
+    # Restricted to local IPs to prevent header spoofing.
     app.add_middleware(
         ProxyHeadersMiddleware,
         trusted_hosts=["127.0.0.1", "localhost", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
     )
 
-    # --- Redirect rules (papi_redirects table, evaluated first) ---
+    # --- Redirect rules (amx_redirects table, evaluated first) ---
     from apymix.middleware.redirect import RedirectMiddleware
     app.add_middleware(RedirectMiddleware, db_url=settings.database_url)
 
@@ -351,7 +340,7 @@ def create_app() -> FastAPI:
     _cors_origins = [o for o in settings.cors_origins_list if "*" not in o]
     _cors_regex = settings.cors_origins_regex
     logger.info(
-        "[CORS] Origines autorisées : %s%s",
+        "[CORS] Allowed origins: %s%s",
         _cors_origins,
         f"  +regex: {_cors_regex}" if _cors_regex else "",
     )
@@ -396,7 +385,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content=content)
 
     # --- Health check ---
-    @app.get(f"{PAPI_PREFIX}/health", tags=["system"])
+    @app.get(f"{AMX_ROUTES_PREFIX}/health", tags=["system"])
     async def health():
         """Check that the app and database are operational."""
         from sqlalchemy import text
@@ -415,7 +404,7 @@ def create_app() -> FastAPI:
 
         result = {
             "status": "healthy" if db_ok else "degraded",
-            "version": papi_version,
+            "version": amx_version,
             "db": {
                 "status": "ok" if db_ok else "error",
                 "backend": db_info["backend"],
@@ -430,27 +419,36 @@ def create_app() -> FastAPI:
         status_code = 200 if db_ok else 503
         return JSONResponse(content=result, status_code=status_code)
 
-    @app.get(f"{PAPI_PREFIX}/status", tags=["system"])
+    @app.get(f"{AMX_ROUTES_PREFIX}/status", tags=["system"])
     async def status_detailed(current_user=Depends(get_current_user)):
         """Detailed status (authenticated) — DB, config, env."""
         from apymix.db.session import get_db_info
 
         db_info = get_db_info()
         return {
-            "version": papi_version,
+            "version": amx_version,
             "env": settings.env,
             "debug": settings.debug,
             "db": db_info,
         }
 
-    # --- Root: minimal message (avoid exposing internals) ---
-    @app.get("/", tags=["system"])
-    async def root():
-        return {"message": f"{papi_name} is running"}
+    # --- Render and cache the landing page once at startup ---
+    # Minimal page: just the app name, styled in pure CSS. No DB, no fronts,
+    # no user-supplied data — keeps the "/" surface tiny and constant.
+    _LANDING_HTML = templates.get_template("landing.html").render(
+        name=amx_name,
+    )
 
-    # --- Internal dashboard (ASCII art + links) ---
-    @app.get(f"{PAPI_PREFIX}/", include_in_schema=False)
+    # --- Root: bare CSS-styled landing page (no DB, no template re-render — served from cache) ---
+    @app.get("/", tags=["system"], include_in_schema=False)
+    async def root():
+        """Minimal landing page: cached CSS-styled title. No DB access."""
+        return HTMLResponse(content=_LANDING_HTML)
+
+    # --- Internal dashboard (CSS-styled title + active fronts + links) ---
+    @app.get(f"{AMX_ROUTES_PREFIX}/", include_in_schema=False)
     async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
+        """Internal dashboard: app title, links, and active frontend buttons."""
         from sqlmodel import select
         from apymix.apps.models import AppEntry, AppStatus
 
@@ -463,7 +461,7 @@ def create_app() -> FastAPI:
         )
         active_fronts = result.scalars().all()
 
-        data = _build_root_page_data(papi_name, papi_version, papi_description)
+        data = _build_root_page_data(amx_name, amx_version, amx_description)
         data["fronts"] = [
             {
                 "name": f.name,
@@ -475,7 +473,7 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse(request, "root_page.html", data)
 
     # --- App registry (monitoring) ---
-    @app.get(f"{PAPI_PREFIX}/apps", tags=["system"])
+    @app.get(f"{AMX_ROUTES_PREFIX}/apps", tags=["system"])
     async def list_apps(request: Request, db: AsyncSession = Depends(get_db)):
         """List all registered applications with their status."""
         from sqlmodel import select
@@ -486,7 +484,7 @@ def create_app() -> FastAPI:
 
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
-            data = _build_apps_page_data(apps, papi_version)
+            data = _build_apps_page_data(apps, amx_version)
             return templates.TemplateResponse(request, "apps_page.html", data)
 
         return {
@@ -496,14 +494,14 @@ def create_app() -> FastAPI:
         }
 
     # --- Auth ---
-    app.include_router(auth_router, prefix=PAPI_PREFIX)
+    app.include_router(auth_router, prefix=AMX_ROUTES_PREFIX)
 
-    # --- Admin API (JSON, protected) — visible dans /-/docs sous le tag "Admin" ---
+    # --- Admin API (JSON, protected) — visible in /-/docs under the "Admin" tag ---
 
-    app.include_router(admin_api_router, prefix=PAPI_PREFIX)
+    app.include_router(admin_api_router, prefix=AMX_ROUTES_PREFIX)
 
     # --- Back-office (SQLAdmin UI) ---
-    setup_admin(app, _get_engine(), base_url=f"{PAPI_PREFIX}/padmin")
+    setup_admin(app, _get_engine(), base_url=f"{AMX_ROUTES_PREFIX}/admx")
 
     # --- APIs and Fronts mounted dynamically during lifespan (_sync_registry) ---
 

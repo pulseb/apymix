@@ -1,11 +1,11 @@
-"""Reverse proxy ASGI pour le développement frontend.
+"""ASGI reverse proxy for frontend development.
 
-En mode dev, permet de servir le frontend via uvicorn/PAPI tout en
-bénéficiant du HMR Vite (hot module replacement) de ``quasar dev``.
+In dev mode, this serves the frontend through uvicorn/PAPI while still
+benefiting from the Vite HMR (hot module replacement) of ``quasar dev``.
 
-Utilise :
-- ``httpx`` (dev dependency) pour le proxy HTTP
-- ``websockets`` (via uvicorn[standard]) pour le proxy WebSocket (HMR)
+Uses:
+- ``httpx`` (dev dependency) for the HTTP proxy
+- ``websockets`` (via uvicorn[standard]) for the WebSocket proxy (HMR)
 """
 
 import asyncio
@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 class DevProxy:
-    """Proxie HTTP et WebSocket vers un serveur de dev frontend.
+    """HTTP and WebSocket proxy to a frontend dev server.
 
-    Monté à la place de ``StaticFiles`` quand ``settings.is_dev`` est True
-    et que le manifest du front déclare un ``dev_port``.
+    Mounted in place of ``StaticFiles`` when ``settings.is_dev`` is True
+    and the frontend manifest declares a ``dev_port``.
 
-    Usage dans app.py::
+    Usage in app.py::
 
         app.mount("/eve", DevProxy(target="http://localhost:9000", prefix="/eve"))
 
     Args:
-        target: URL du serveur de dev (ex: ``http://localhost:9000``).
-        prefix: Préfixe URL du frontend (ex: ``/eve``). Nécessaire car
-                Starlette strip le préfixe avant d'appeler le sous-app.
+        target: Dev server URL (e.g. ``http://localhost:9000``).
+        prefix: Frontend URL prefix (e.g. ``/eve``). Needed because
+                Starlette strips the prefix before calling the sub-app.
     """
 
     def __init__(self, target: str, prefix: str = ""):
@@ -79,7 +79,7 @@ class DevProxy:
         url = f"{self.target}{path}{'?' + query if query else ''}"
         logger.debug("Dev proxy raw scope path: %s", raw_path)
 
-        # Filtrer les headers hop-by-hop
+        # Filter hop-by-hop headers
         headers = {
             k: v
             for k, v in request.headers.items()
@@ -95,7 +95,7 @@ class DevProxy:
                 headers=headers,
                 content=await request.body(),
             )
-            # Ne pas relayer les headers d'encodage (httpx décompresse déjà)
+            # Do not relay encoding headers (httpx already decompressed)
             skip = {"transfer-encoding", "content-encoding", "content-length"}
             resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in skip}
 
@@ -104,15 +104,15 @@ class DevProxy:
         except Exception as exc:
             logger.warning("Dev proxy → %s : %s", url, exc)
             error = Response(
-                content=f"Dev proxy : impossible de joindre {self.target}\n"
-                f"Le serveur quasar dev tourne-t-il ? (npx quasar dev)",
+                content=f"Dev proxy: cannot reach {self.target}\n"
+                f"Is the quasar dev server running? (npx quasar dev)",
                 status_code=502,
                 media_type="text/plain",
             )
             await error(scope, receive, send)
 
     # ------------------------------------------------------------------
-    # WebSocket (nécessaire pour le HMR Vite)
+    # WebSocket (required for Vite HMR)
     # ------------------------------------------------------------------
 
     async def _handle_ws(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -126,7 +126,7 @@ class DevProxy:
         try:
             import websockets  # via uvicorn[standard]
         except ImportError:
-            logger.warning("websockets non installé — HMR WebSocket non proxié")
+            logger.warning("websockets not installed — HMR WebSocket not proxied")
             await client_ws.close(code=1001)
             return
 
@@ -136,7 +136,7 @@ class DevProxy:
             async with websockets.connect(target_url) as server_ws:
 
                 async def _relay_client_to_server():
-                    """Relaie les messages du navigateur vers le serveur Vite."""
+                    """Relay messages from the browser to the Vite server."""
                     try:
                         while True:
                             data = await client_ws.receive_text()
@@ -145,7 +145,7 @@ class DevProxy:
                         pass
 
                 async def _relay_server_to_client():
-                    """Relaie les messages du serveur Vite vers le navigateur."""
+                    """Relay messages from the Vite server to the browser."""
                     try:
                         async for msg in server_ws:
                             if isinstance(msg, str):

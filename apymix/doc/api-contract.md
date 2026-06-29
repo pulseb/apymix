@@ -1,26 +1,26 @@
-# Contrat d'API — Routes système PAPI
+# API Contract — Apymix System Routes
 
-## Conventions globales
+## Global conventions
 
 ### Base URL
 
-| Environnement | URL |
+| Environment | URL |
 |---------------|-----|
-| Dev local | `http://localhost:8000` |
-| Production | `https://<domaine>/` |
+| Local dev | `http://localhost:8000` |
+| Production | `https://<domain>/` |
 
-### Préfixes
+### Prefixes
 
-| Préfixe | Rôle |
+| Prefix | Role |
 |---------|------|
-| `/-/` | Routes système PAPI (auth, health, admin, apps) |
-| `/api/{nom}` | APIs métier (ex : `/api/eve`) |
-| `/{nom}` | Frontends (ex : `/eve`) |
-| `/` | Racine — informations générales |
+| `/-/` | Apymix system routes (auth, health, admin, apps) |
+| `/api/{name}` | Business APIs (e.g. `/api/eve`) |
+| `/{name}` | Frontends (e.g. `/eve`) |
+| `/` | Root — general information |
 
-### Format des réponses
+### Response format
 
-Toutes les réponses JSON suivent la structure :
+All JSON responses follow this structure:
 
 ```json
 {
@@ -31,45 +31,45 @@ Toutes les réponses JSON suivent la structure :
 }
 ```
 
-- `data` : objet ou liste (toujours présent)
-- `message` : description courte du résultat
-- `paging` : uniquement pour les listes paginées
-- `metadata` : infos supplémentaires contextuelles (stats, event…)
+- `data`: object or list (always present)
+- `message`: short description of the result
+- `paging`: only for paginated lists
+- `metadata`: additional contextual info (stats, event, etc.)
 
-### Authentification
+### Authentication
 
-Deux modes d'authentification via header `Authorization: Bearer <token>` :
+Two authentication modes via the `Authorization: Bearer <token>` header:
 
-1. **JWT** (recommandé) : obtenu via `POST /-/auth/login`, expire après N minutes, renouvelable via `POST /-/auth/refresh`
-2. **api_token** (statique) : token longue durée généré via `POST /-/auth/me/token`, pratique pour scripts et intégrations
+1. **JWT** (recommended): obtained via `POST /-/auth/login`, expires after N minutes, renewable via `POST /-/auth/refresh`
+2. **api_token** (static): long-lived token generated via `POST /-/auth/me/token`, handy for scripts and integrations
 
-Les deux sont acceptés partout où `Depends(get_current_user)` est utilisé.
+Both are accepted wherever `Depends(get_current_user)` is used.
 
-### Codes HTTP communs
+### Common HTTP codes
 
-| Code | Signification |
+| Code | Meaning |
 |------|---------------|
-| `200` | Succès |
-| `201` | Ressource créée |
-| `204` | Suppression réussie (pas de body) |
-| `400` | Requête invalide / événement inactif |
-| `401` | Non authentifié / token invalide |
-| `403` | Accès interdit (compte désactivé, pas de password admin) |
-| `404` | Ressource introuvable |
-| `409` | Conflit (doublon slug, doublon email/event) |
-| `422` | Erreur de validation Pydantic |
+| `200` | Success |
+| `201` | Resource created |
+| `204` | Successful deletion (no body) |
+| `400` | Invalid request / inactive event |
+| `401` | Unauthenticated / invalid token |
+| `403` | Forbidden (disabled account, no admin password) |
+| `404` | Resource not found |
+| `409` | Conflict (duplicate slug, duplicate email/event) |
+| `422` | Pydantic validation error |
 
 ---
 
-## Racine
+## Root
 
 ### `GET /`
 
-Informations générales PulseApps.
+General PulseApps information.
 
-**Auth :** aucune
+**Auth:** none
 
-**Réponse 200 :**
+**Response 200:**
 
 ```json
 {
@@ -82,15 +82,15 @@ Informations générales PulseApps.
 
 ---
 
-## Routes système (`/-/`)
+## System routes (`/-/`)
 
 ### `GET /-/health`
 
 Health check.
 
-**Auth :** aucune
+**Auth:** none
 
-**Réponse 200 :**
+**Response 200:**
 
 ```json
 {
@@ -103,18 +103,18 @@ Health check.
 
 ### `GET /-/apps`
 
-Liste des applications enregistrées (registre).
+List of registered applications (registry).
 
-**Auth :** aucune
+**Auth:** none
 
-**Query params :**
+**Query params:**
 
-| Param | Type | Défaut | Description |
-|-------|------|--------|-------------|
-| `type` | string | — | Filtrer par type : `api` ou `front` |
-| `status` | string | — | Filtrer par statut : `active`, `disabled`, `unavailable` |
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | string | — | Filter by type: `api` or `front` |
+| `status` | string | — | Filter by status: `active`, `disabled`, `unavailable` |
 
-**Réponse 200 :**
+**Response 200:**
 
 ```json
 {
@@ -126,7 +126,7 @@ Liste des applications enregistrées (registre).
       "prefix": "/eve",
       "status": "active",
       "docs_enabled": true,
-      "description": "API Eve — événements + RSVP",
+      "description": "Eve API — events + RSVP",
       "version": "0.1.0",
       "last_seen_at": "2026-02-25T10:00:00Z",
       "created_at": "2026-02-25T10:00:00Z",
@@ -139,15 +139,15 @@ Liste des applications enregistrées (registre).
 
 ---
 
-## Authentification (`/-/auth`)
+## Authentication (`/-/auth`)
 
 ### `POST /-/auth/login`
 
-Obtenir un JWT.
+Obtain a JWT.
 
-**Auth :** aucune
+**Auth:** none
 
-**Body :**
+**Body:**
 
 ```json
 {
@@ -156,7 +156,7 @@ Obtenir un JWT.
 }
 ```
 
-**Réponse 200 :**
+**Response 200:**
 
 ```json
 {
@@ -167,17 +167,17 @@ Obtenir un JWT.
 }
 ```
 
-**Erreurs :** `401` email/password incorrect, `403` compte désactivé.
+**Errors:** `401` invalid email/password, `403` disabled account.
 
 ---
 
 ### `POST /-/auth/refresh`
 
-Renouveler un JWT via refresh token.
+Renew a JWT using a refresh token.
 
-**Auth :** aucune
+**Auth:** none
 
-**Body :**
+**Body:**
 
 ```json
 {
@@ -185,19 +185,19 @@ Renouveler un JWT via refresh token.
 }
 ```
 
-**Réponse 200 :** même format que `/login`.
+**Response 200:** same format as `/login`.
 
-**Erreurs :** `401` refresh token invalide ou expiré.
+**Errors:** `401` invalid or expired refresh token.
 
 ---
 
 ### `GET /-/auth/me`
 
-Informations de l'utilisateur connecté.
+Information about the connected user.
 
-**Auth :** JWT ou api_token (Bearer)
+**Auth:** JWT or api_token (Bearer)
 
-**Réponse 200 :**
+**Response 200:**
 
 ```json
 {
@@ -213,51 +213,51 @@ Informations de l'utilisateur connecté.
 
 ### `POST /-/auth/me/token`
 
-Générer (ou régénérer) un api_token statique.
+Generate (or regenerate) a static api_token.
 
-**Auth :** JWT ou api_token (Bearer)
+**Auth:** JWT or api_token (Bearer)
 
-**Réponse 200 :** même format que `GET /me`, avec le nouveau `api_token`.
+**Response 200:** same format as `GET /me`, with the new `api_token`.
 
 ---
 
 ### `DELETE /-/auth/me/token`
 
-Révoquer l'api_token.
+Revoke the api_token.
 
-**Auth :** JWT ou api_token (Bearer)
+**Auth:** JWT or api_token (Bearer)
 
-**Réponse 200 :** même format que `GET /me`, avec `api_token: null`.
+**Response 200:** same format as `GET /me`, with `api_token: null`.
 
 ---
 
-## API Admin (`/-/api/*`)
+## Admin API (`/-/api/*`)
 
-> **Authentification :** Tous les endpoints requièrent un JWT Bearer valide avec rôle `admin`.
-> 
-> **Header :** `Authorization: Bearer <access_token>`
-> 
-> **Obtention du token :** `POST /-/auth/login` avec email + password
-> 
-> **Rate limiting :** 200 requêtes par minute par IP (global).
+> **Authentication:** All endpoints require a valid JWT Bearer with the `admin` role.
+>
+> **Header:** `Authorization: Bearer <access_token>`
+>
+> **Obtaining the token:** `POST /-/auth/login` with email + password
+>
+> **Rate limiting:** 200 requests per minute per IP (global).
 
 ### `GET /-/api`
 
-Point d'entrée et documentation de l'API admin.
+Entry point and documentation for the admin API.
 
-**Auth :** JWT Bearer, rôle admin
+**Auth:** JWT Bearer, admin role
 
-**Réponse 200 :** Voir ci-dessus.
+**Response 200:** See above.
 
 ---
 
 ### `GET /-/api/seeds`
 
-Liste toutes les APIs qui ont un seed disponible.
+List all APIs that have a seed available.
 
-**Auth :** JWT Bearer, rôle admin
+**Auth:** JWT Bearer, admin role
 
-**Réponse 200 :**
+**Response 200:**
 
 ```json
 {
@@ -273,68 +273,68 @@ Liste toutes les APIs qui ont un seed disponible.
 
 ### `POST /-/api/seeds/{api_name}`
 
-Déclenche le seed d'une API spécifique.
+Trigger the seed of a specific API.
 
-**Auth :** JWT Bearer, rôle admin
+**Auth:** JWT Bearer, admin role
 
-**Path params :**
+**Path params:**
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `api_name` | string | Nom de l'API (ex: `eve`) |
+| `api_name` | string | API name (e.g. `eve`) |
 
-**Réponse 200 (seed exécuté) :**
+**Response 200 (seed executed):**
 
 ```json
 {
   "data": {
     "api": "eve",
     "seeded": true,
-    "message": "Seed exécuté avec succès",
+    "message": "Seed executed successfully",
     "timestamp": "2026-03-03T12:00:00.000000"
   },
   "message": "ok"
 }
 ```
 
-**Réponse 200 (données déjà présentes) :**
+**Response 200 (data already present):**
 
 ```json
 {
   "data": {
     "api": "eve",
     "seeded": false,
-    "message": "Données déjà présentes — aucune action",
+    "message": "Data already present — no action taken",
     "timestamp": "2026-03-03T12:00:00.000000"
   },
   "message": "ok"
 }
 ```
 
-**Erreurs :**
+**Errors:**
 
-| Code | Signification |
+| Code | Meaning |
 |------|---------------|
-| `401` | Token invalide ou absent |
-| `403` | Rôle insuffisant (non admin) |
-| `404` | API n'a pas de seed disponible |
-| `429` | Rate limit dépassé |
-| `500` | Erreur lors du seed |
+| `401` | Invalid or missing token |
+| `403` | Insufficient role (not admin) |
+| `404` | API has no seed available |
+| `429` | Rate limit exceeded |
+| `500` | Error during seed |
 
 ---
 
-## Récapitulatif des endpoints système
+## System endpoints summary
 
-| Méthode | Chemin | Auth | Description |
+| Method | Path | Auth | Description |
 |---------|--------|------|-------------|
-| `GET` | `/` | — | Infos PulseApps |
+| `GET` | `/` | — | PulseApps info |
 | `GET` | `/-/health` | — | Health check |
-| `GET` | `/-/apps` | — | Registre des applications |
-| `POST` | `/-/auth/login` | — | Login JWT |
+| `GET` | `/-/apps` | — | Application registry |
+| `POST` | `/-/auth/login` | — | JWT login |
 | `POST` | `/-/auth/refresh` | — | Refresh JWT |
 | `GET` | `/-/auth/me` | JWT/token | User info |
-| `POST` | `/-/auth/me/token` | JWT/token | Générer api_token |
-| `DELETE` | `/-/auth/me/token` | JWT/token | Révoquer api_token |
-| `GET` | `/-/api` | JWT admin | Info API admin |
-| `GET` | `/-/api/seeds` | JWT admin | Lister les APIs seedables |
-| `POST` | `/-/api/seeds/{name}` | JWT admin | Déclencher seed API |
+| `POST` | `/-/auth/me/token` | JWT/token | Generate api_token |
+| `DELETE` | `/-/auth/me/token` | JWT/token | Revoke api_token |
+| `GET` | `/-/api` | JWT admin | Admin API info |
+| `GET` | `/-/api/seeds` | JWT admin | List seedable APIs |
+| `POST` | `/-/api/seeds/{name}` | JWT admin | Trigger API seed |

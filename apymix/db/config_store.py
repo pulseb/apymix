@@ -1,10 +1,10 @@
-"""Stockage et récupération de la configuration interne PAPI depuis la DB.
+"""Storage and retrieval of internal Apymix configuration from the DB.
 
-Priorité du JWT secret :
-    1. Variable d'env JWT_SECRET (dev : stable entre reloads, ou override forcé)
-    2. Valeur en DB (générée automatiquement au premier démarrage si absente)
+JWT secret priority:
+    1. JWT_SECRET environment variable (dev: stable across reloads, or forced override)
+    2. DB value (automatically generated on first startup if absent)
 
-Usage :
+Usage:
     secret = await get_or_create_jwt_secret(session)
 """
 
@@ -23,10 +23,10 @@ _VERBOSE_ERRORS_KEY = "verbose_errors"
 
 
 async def get_or_create_jwt_secret(session: AsyncSession) -> str:
-    """Retourne le JWT secret actif.
+    """Returns the active JWT secret.
 
-    - Si JWT_SECRET est défini en variable d'env → l'utilise directement.
-    - Sinon → charge depuis papi_config, ou génère et persiste un secret aléatoire.
+    - If JWT_SECRET is defined as an env var → use it directly.
+    - Otherwise → load from amx_config, or generate and persist a random secret.
     """
     env_secret = os.environ.get("JWT_SECRET")
     if env_secret:
@@ -38,7 +38,7 @@ async def get_or_create_jwt_secret(session: AsyncSession) -> str:
         logger.debug("JWT secret loaded from database")
         return config.value
 
-    # Première fois : générer et persister
+    # First time: generate and persist
     new_secret = secrets.token_hex(32)
     session.add(AmxConfig(key=_JWT_SECRET_KEY, value=new_secret))
     await session.commit()
@@ -47,10 +47,10 @@ async def get_or_create_jwt_secret(session: AsyncSession) -> str:
 
 
 async def get_verbose_errors(session: AsyncSession) -> bool:
-    """Retourne True si le mode verbose des erreurs 500 est activé en DB.
+    """Returns True if the verbose 500-error mode is enabled in the DB.
 
-    Clé DB : verbose_errors = "true" | "false"
-    Permet d'exposer le traceback Python dans les réponses 500 sans passer en is_dev.
+    DB key: verbose_errors = "true" | "false"
+    Allows exposing the Python traceback in 500 responses without toggling is_dev.
     """
     config = await session.get(AmxConfig, _VERBOSE_ERRORS_KEY)
     if config:

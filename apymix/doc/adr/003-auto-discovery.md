@@ -1,31 +1,31 @@
-# ADR-003 : Découverte automatique des sub-apps API
+# ADR-003 : Automatic Discovery of API Sub-Apps
 
-**Statut :** Accepté
-**Date :** 2026-02-24
+**Status:** Accepted
+**Date:** 2026-02-24
 
-## Contexte
+## Context
 
-PAPI doit permettre d'ajouter de nouvelles APIs métier sans modifier le code du module technique (`papi/`). Le module doit rester **complètement agnostique** des APIs pour pouvoir être réutilisé (voire open-sourcé). 
+Apymix must allow adding new business APIs without modifying the technical module's code (`apymix/`). The module must stay **completely agnostic** of the APIs to remain reusable (and even open-sourceable).
 
-Trois approches sont envisageables pour connecter les sub-apps à l'app principale.
+Three approaches can be considered for connecting sub-apps to the main app.
 
-## Options envisagées
+## Considered options
 
-### Option A : Enregistrement manuel
+### Option A : Manual registration
 
-Chaque sub-app est importée et montée explicitement dans `papi/app.py`.
+Each sub-app is imported and mounted explicitly in `apymix/app.py`.
 
 ```python
 from apis.wedding.app import app as wedding_app
 main_app.mount("/wedding", wedding_app)
 ```
 
-- **Avantages :** Explicite, simple à comprendre, contrôle total.
-- **Inconvénients :** Le module `papi/` importe directement depuis `apis/` → couplage fort. Chaque nouvelle API nécessite une modification de `papi/app.py`.
+- **Pros:** Explicit, easy to understand, full control.
+- **Cons:** The `apymix/` module imports directly from `apis/` → strong coupling. Each new API requires modifying `apymix/app.py`.
 
-### Option B : Fichier de configuration central
+### Option B : Central configuration file
 
-Un fichier `apis.yaml` à la racine liste les APIs à monter.
+An `apis.yaml` file at the root lists the APIs to mount.
 
 ```yaml
 apis:
@@ -35,61 +35,60 @@ apis:
     prefix: /finance
 ```
 
-- **Avantages :** Découplé (pas d'import dans `papi/`), facile à lire.
-- **Inconvénients :** Fichier central à maintenir, pas de co-localisation (la config est séparée du code de l'API).
+- **Pros:** Decoupled (no import in `apymix/`), easy to read.
+- **Cons:** Central file to maintain, no co-location (config is separated from the API code).
 
-### Option C : Convention + manifest local (auto-discovery)
+### Option C : Convention + local manifest (auto-discovery)
 
-L'app factory scanne le dossier `apis/`. Chaque sous-dossier contenant un `app.py` avec une instance `app` (FastAPI) est automatiquement monté. Un `manifest.yaml` optionnel par API permet de surcharger les métadonnées.
+The app factory walks the workspace for `amx.yaml` files. Each project declaring `type: api` is automatically mounted. An optional `amx.yaml` per project allows customizing metadata.
 
-- **Avantages :** Zéro configuration centrale, co-localisation (chaque API porte ses propres métadonnées), ajout d'une API = créer un dossier, convention simple et documentée.
-- **Inconvénients :** "Magie" implicite (import dynamique), peut surprendre un nouveau contributeur. Nécessite une convention bien documentée.
+- **Pros:** Zero central configuration, co-location (each API carries its own metadata), adding an API = creating a project, simple and documented convention.
+- **Cons:** Implicit "magic" (dynamic import), can surprise a new contributor. Requires a well-documented convention.
 
-## Décision
+## Decision
 
-**Option C : Convention + manifest local (auto-discovery).**
+**Option C: Convention + local manifest (auto-discovery).**
 
-C'est l'approche la plus alignée avec les objectifs du projet :
+This is the approach most aligned with the project's goals:
 
-1. **Découplage total** : `papi/` ne connaît aucune API nommément
-2. **Frictionless** : ajouter une API = créer un dossier avec `app.py`
-3. **Flexible** : le `manifest.yaml` optionnel permet de personnaliser sans imposer
+1. **Full decoupling**: `apymix/` knows no API by name
+2. **Frictionless**: adding an API = creating a project with an `amx.yaml`
+3. **Flexible**: the `amx.yaml` allows customization without imposing it
 
-### Convention de découverte
+### Discovery convention
 
-Pour qu'un dossier dans `apis/` soit reconnu :
+For a project to be recognized:
 
-| Élément | Obligatoire | Description |
+| Element | Required | Description |
 |---------|-------------|-------------|
-| `app.py` avec `app = FastAPI(...)` | ✅ Oui | Point d'entrée de la sub-app |
-| `manifest.yaml` | ❌ Non | Métadonnées : `name`, `prefix`, `description`, `version`, `enabled` |
+| `amx.yaml` with `type: api` and `module: <module>` exporting `app: FastAPI` | ✅ Yes | Sub-app entry point |
+| `amx.yaml` fields: `route`, `enabled`, `version`, `description` | ❌ No | Metadata overrides |
 
-### Valeurs par défaut (sans manifest)
+### Default values (without overrides)
 
-| Champ | Valeur inférée |
+| Field | Inferred value |
 |-------|----------------|
-| `prefix` | `/<nom_du_dossier>` |
-| `name` | Nom du dossier capitalisé |
+| `route` | `/<directory_name>` |
 | `enabled` | `true` |
 
-### Conventions d'exclusion
+### Exclusion conventions
 
-- Les dossiers commençant par `_` sont ignorés (ex : `_archive/`)
-- Les dossiers sans `app.py` sont ignorés silencieusement
-- Un `manifest.yaml` avec `enabled: false` désactive l'API sans la supprimer
+- Folders starting with `_` are ignored (e.g. `_archive/`)
+- Folders without `amx.yaml` declaring `type: api` are silently ignored
+- An `amx.yaml` with `enabled: false` disables the API without removing it
 
-## Conséquences
+## Consequences
 
-### Positives
-- Le module `papi/` est 100% agnostique des APIs → open-sourceable
-- Ajouter une API ne nécessite aucune modification existante
-- Le `manifest.yaml` offre de la flexibilité sans complexité
-- La même convention est utilisée pour `fronts/` (cohérence)
+### Positive
+- The `apymix/` module is 100% agnostic of APIs → open-sourceable
+- Adding an API requires no existing modification
+- `amx.yaml` offers flexibility without complexity
+- The same convention is used for frontends (consistency)
 
-### Négatives
-- L'import dynamique (`importlib.import_module`) peut rendre le debugging moins intuitif
-- Si un `app.py` a une erreur de syntaxe, le message d'erreur peut être moins clair
+### Negative
+- Dynamic import (`importlib.import_module`) can make debugging less intuitive
+- If an `amx.yaml` is malformed, the error message may be less clear
 
-### Risques
-- Risque de collision de préfixes si deux APIs ont le même nom de dossier → mitigé par la validation au démarrage
-- Ordre de montage non déterministe → mitigé par le tri alphabétique des dossiers
+### Risks
+- Risk of prefix collision if two APIs share the same directory name → mitigated by validation at startup
+- Non-deterministic mount order → mitigated by alphabetical sorting of directories

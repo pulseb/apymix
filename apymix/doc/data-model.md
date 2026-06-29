@@ -1,10 +1,10 @@
-# Modèle de données — APYMIX
+# Data Model — APYMIX
 
-## Vue d'ensemble
+## Overview
 
 ```
 ┌────────────────┐
-│  apymix_apps      │       (apymix/apps — registre des applications)
+│  amx_apps      │       (apymix/apps — application registry)
 │────────────────│
 │ id (PK, int)    │
 │ name (unique)   │
@@ -20,7 +20,7 @@
 └────────────────┘
 
 ┌─────────────┐
-│    User      │       (papi/auth — table partagée)
+│    User      │       (apymix/auth — shared table)
 │─────────────│
 │ id (PK, UUID)│
 │ email (unique)│
@@ -35,46 +35,46 @@
 
 ---
 
-## AppEntry (`papi_apps`)
+## AppEntry (`amx_apps`)
 
-Registre des applications découvertes. Synchronisé automatiquement au démarrage.
+Registry of discovered applications. Synchronized automatically at startup.
 
-| Colonne | Type | Contraintes | Description |
+| Column | Type | Constraints | Description |
 |---------|------|-------------|-------------|
-| `id` | INTEGER | PK, auto | Identifiant unique |
-| `name` | VARCHAR(100) | UNIQUE, NOT NULL, INDEX | Nom de l'application (ex : `eve`) |
-| `app_type` | VARCHAR(10) | NOT NULL | `api` ou `front` |
-| `prefix` | VARCHAR(100) | NOT NULL | Préfixe URL (ex : `/eve`) |
+| `id` | INTEGER | PK, auto | Unique identifier |
+| `name` | VARCHAR(100) | UNIQUE, NOT NULL, INDEX | Application name (e.g. `eve`) |
+| `app_type` | VARCHAR(10) | NOT NULL | `api` or `front` |
+| `prefix` | VARCHAR(100) | NOT NULL | URL prefix (e.g. `/eve`) |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT 'active' | `active`, `disabled`, `unavailable` |
-| `docs_enabled` | BOOLEAN | NOT NULL, DEFAULT true | Afficher la doc OpenAPI |
-| `description` | VARCHAR(500) | DEFAULT '' | Description de l'application |
-| `version` | VARCHAR(20) | DEFAULT '0.0.0' | Version de l'application |
-| `last_seen_at` | DATETIME | NOT NULL | Dernière découverte au démarrage |
-| `created_at` | DATETIME | NOT NULL, auto | Date de création |
-| `updated_at` | DATETIME | NOT NULL, auto | Dernière modification |
+| `docs_enabled` | BOOLEAN | NOT NULL, DEFAULT true | Show OpenAPI doc |
+| `description` | VARCHAR(500) | DEFAULT '' | Application description |
+| `version` | VARCHAR(20) | DEFAULT '0.0.0' | Application version |
+| `last_seen_at` | DATETIME | NOT NULL | Last discovery at startup |
+| `created_at` | DATETIME | NOT NULL, auto | Creation date |
+| `updated_at` | DATETIME | NOT NULL, auto | Last modified |
 
 ---
 
 ## User (`users`)
 
-Utilisateurs authentifiés (administrateurs). Table partagée entre toutes les APIs.
+Authenticated users (administrators). Table shared across all APIs.
 
-| Colonne | Type | Contraintes | Description |
+| Column | Type | Constraints | Description |
 |---------|------|-------------|-------------|
-| `id` | UUID | PK, auto | Identifiant unique |
-| `email` | VARCHAR(255) | UNIQUE, NOT NULL, INDEX | Email de connexion |
-| `password_hash` | VARCHAR(255) | NOT NULL | Hash bcrypt du mot de passe |
-| `role` | VARCHAR(50) | NOT NULL, DEFAULT 'admin' | Rôle utilisateur |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Compte actif |
-| `api_token` | VARCHAR(64) | UNIQUE, NULL, INDEX | Token statique pour intégrations |
-| `created_at` | DATETIME | NOT NULL, auto | Date de création |
-| `updated_at` | DATETIME | NOT NULL, auto | Dernière modification |
+| `id` | UUID | PK, auto | Unique identifier |
+| `email` | VARCHAR(255) | UNIQUE, NOT NULL, INDEX | Login email |
+| `password_hash` | VARCHAR(255) | NOT NULL | Bcrypt hash of the password |
+| `role` | VARCHAR(50) | NOT NULL, DEFAULT 'admin' | User role |
+| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Account active |
+| `api_token` | VARCHAR(64) | UNIQUE, NULL, INDEX | Static token for integrations |
+| `created_at` | DATETIME | NOT NULL, auto | Creation date |
+| `updated_at` | DATETIME | NOT NULL, auto | Last modified |
 
 ---
 
-## Champs automatiques (TimestampMixin)
+## Automatic fields (TimestampMixin)
 
-Toutes les entités héritent d'un mixin qui fournit `created_at` et `updated_at` :
+All entities inherit from a mixin that provides `created_at` and `updated_at`:
 
 ```python
 from datetime import datetime, timezone
@@ -88,10 +88,10 @@ class BaseUUIDModel(TimestampMixin):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 ```
 
-### Exemple de modèle AppEntry
+### Example AppEntry model
 
 ```python
-# papi/apps/models.py
+# apymix/apps/models.py
 from enum import Enum
 from sqlmodel import SQLModel, Field
 
@@ -105,7 +105,7 @@ class AppType(str, Enum):
     front = "front"
 
 class AppEntry(TimestampMixin, table=True):
-    __tablename__ = "papi_apps"
+    __tablename__ = "amx_apps"
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(max_length=100, unique=True, index=True)
     app_type: str = Field(max_length=10)

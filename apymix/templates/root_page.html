@@ -9,7 +9,7 @@
         body {
             background: #0f172a;
             color: #e2e8f0;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,20 +17,28 @@
             padding: 2rem;
         }
         .container { text-align: center; max-width: 700px; }
-        pre {
-            color: #38bdf8;
-            font-size: clamp(0.5rem, 2vw, 0.9rem);
-            line-height: 1.2;
-            margin-bottom: 2rem;
-            white-space: pre;
-            display: inline-block;
-            text-align: left;
+        .app-title {
+            font-size: clamp(3rem, 10vw, 6rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            text-shadow: 0 0 40px rgba(56, 189, 248, 0.15);
+            word-break: break-word;
         }
-        .version {
+        .app-title span { display: inline-block; }
+        .app-meta {
             color: #64748b;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             margin-bottom: 2rem;
         }
+        .app-version { color: #94a3b8; font-weight: 600; }
+        .app-description { color: #64748b; }
         .messages p {
             color: #94a3b8;
             font-size: 1rem;
@@ -57,12 +65,34 @@
             background: #1e293b;
             border-color: #38bdf8;
         }
+        .fronts { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #334155; }
+        .fronts-label { color: #64748b; font-size: 0.85rem; margin-bottom: 1rem; }
+        .fronts-list { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .fronts-list a {
+            color: #38bdf8;
+            text-decoration: none;
+            padding: 0.5rem 1.2rem;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            background: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .fronts-list a:hover { border-color: #38bdf8; }
+        .fronts-list img { width: 24px; height: 24px; border-radius: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <pre>{{ ascii_art }}</pre>
-        <div class="version">v{{ version }} — {{ description }}</div>
+        <h1 class="app-title"><span>{{ name }}</span></h1>
+        <div class="app-meta">
+            <span class="app-version">v{{ version }}</span>
+            {% if version and description %} — {% endif %}
+            {% if description %}<span class="app-description">{{ description }}</span>{% endif %}
+        </div>
         <div class="messages">
             <p><span class="flag">🇬🇧</span> Welcome! Your multi-API platform is up and running.</p>
             <p><span class="flag">🇫🇷</span> Bienvenue ! Votre plateforme multi-API est opérationnelle.</p>
@@ -70,18 +100,18 @@
         </div>
         <div class="links">
             <a href="/-/docs">📖 API Docs</a>
-            <a href="/-/padmin">🔧 Admin</a>
+            <a href="/-/admx">🔧 Admin</a>
             <a href="/-/health">💚 Health</a>
             <a href="/-/apps">📦 Apps</a>
         </div>
         {% if fronts %}
-        <div class="fronts" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #334155;">
-            <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 1rem;">Applications disponibles :</p>
-            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <div class="fronts">
+            <p class="fronts-label">Available applications:</p>
+            <div class="fronts-list">
                 {% for front in fronts %}
-                <a href="{{ front.prefix }}/" style="color: #38bdf8; text-decoration: none; padding: 0.5rem 1.2rem; border: 1px solid #334155; border-radius: 6px; transition: all 0.2s; font-size: 0.9rem; background: #1e293b; display: flex; align-items: center; gap: 0.5rem;">
+                <a href="{{ front.prefix }}/">
                     {% if front.icon %}
-                    <img src="{{ front.icon }}" alt="{{ front.name }}" style="width: 24px; height: 24px; border-radius: 4px;">
+                    <img src="{{ front.icon }}" alt="{{ front.name }}">
                     {% else %}
                     🚀
                     {% endif %}
@@ -94,3 +124,4 @@
     </div>
 </body>
 </html>
+

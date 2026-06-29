@@ -1,8 +1,8 @@
-"""API admin pour PAPI — gestion des seeds, audit, monitoring.
+"""Admin API for Apymix — seed management, audit, monitoring.
 
-Montée sur `/-/api/*` — endpoints JSON protégés par JWT Bearer.
-Authentification: Authorization: Bearer <access_token>
-Tous les endpoints requièrent un utilisateur avec rôle 'admin'.
+Mounted on `/-/api/*` — JSON endpoints protected by JWT Bearer.
+Authentication: Authorization: Bearer <access_token>
+All endpoints require a user with the 'admin' role.
 """
 
 import importlib
@@ -28,29 +28,29 @@ router = APIRouter(prefix="/api", tags=["admin"])
 
 
 async def _require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Dépendance pour vérifier l'authentification + rôle admin.
-    
-    Requiert: Authorization: Bearer <jwt>
-    Vérifie: user.role == 'admin'
-    Lève HTTPException 403 si pas admin.
-    
-    Retourne l'User pour audit logging.
+    """Dependency to verify authentication + admin role.
+
+    Requires: Authorization: Bearer <jwt>
+    Checks: user.role == 'admin'
+    Raises HTTPException 403 if not admin.
+
+    Returns the User for audit logging.
     """
     if not current_user.has_role("admin"):
         logger.warning(
-            "Tentative d'accès /-/api/* avec rôle insuffisant (user_id=%s, roles=%s)",
+            "Attempt to access /-/api/* with insufficient role (user_id=%s, roles=%s)",
             current_user.id,
             current_user.roles,
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accès réservé aux administrateurs",
+            detail="Access restricted to administrators",
         )
     return current_user
 
 
 def _discover_seedable_apis() -> list[str]:
-    """Liste les APIs qui ont un fichier seed.py."""
+    """List the APIs that have a seed.py file."""
     apis_dir = Path(__file__).resolve().parent.parent.parent / "apis"
     result = []
     if not apis_dir.is_dir():
@@ -62,8 +62,8 @@ def _discover_seedable_apis() -> list[str]:
 
 
 def _log_audit(user_id: str, action: str, resource: str, status: str, details: str = "") -> None:
-    """Log une action admin pour audit trail.
-    
+    """Log an admin action for the audit trail.
+
     Format: [AUDIT] [user_id] action resource status details
     """
     timestamp = datetime.utcnow().isoformat()
@@ -74,11 +74,11 @@ def _log_audit(user_id: str, action: str, resource: str, status: str, details: s
 
 @router.get("/docs", include_in_schema=False)
 async def admin_docs():
-    """Swagger UI pour les routes admin (/-/api/*). Pas d'auth requise pour accéder à la doc."""
+    """Swagger UI for the admin routes (/-/api/*). No auth required to access the doc."""
     from fastapi.openapi.docs import get_swagger_ui_html
     return get_swagger_ui_html(
         openapi_url="/-/openapi.json",
-        title="PAPI Admin — Swagger UI",
+        title="Apymix Admin — Swagger UI",
         swagger_ui_parameters={"persistAuthorization": True, "filter": "🔧 Admin"},
     )
 
@@ -91,11 +91,11 @@ async def admin_api_root(current_user: User = Depends(_require_admin)) -> dict[s
             "version": "0.1.0",
             "user": current_user.email,
             "endpoints": {
-                "seeds": "GET /-/api/seeds — Liste toutes les APIs seedables",
-                "trigger_seed": "POST /-/api/seeds/{name} — Déclenche un seed",
-                "reset_tables": "POST /-/api/tables/reset — DROP + CREATE de tables (destructif)",
+                "seeds": "GET /-/api/seeds — Lists all seedable APIs",
+                "trigger_seed": "POST /-/api/seeds/{name} — Triggers a seed",
+                "reset_tables": "POST /-/api/tables/reset — DROP + CREATE tables (destructive)",
             },
-            "docs": "Voir /-/docs pour la documentation complète",
+            "docs": "See /-/docs for full documentation",
         },
         "message": "ok",
     }
@@ -103,10 +103,10 @@ async def admin_api_root(current_user: User = Depends(_require_admin)) -> dict[s
 
 @router.get("/seeds")
 async def list_seeds(current_user: User = Depends(_require_admin)) -> dict[str, Any]:
-    """Liste toutes les APIs qui ont un seed disponible.
-    
-    **Auth:** JWT Bearer (role admin requise)
-    **Audit:** Enregistré
+    """List all APIs that have an available seed.
+
+    **Auth:** JWT Bearer (admin role required)
+    **Audit:** Logged
     """
     apis = _discover_seedable_apis()
     _log_audit(str(current_user.id), "GET", "/-/api/seeds", "ok", f"found {len(apis)} seedable APIs")
@@ -125,59 +125,59 @@ async def trigger_seed(
     current_user: User = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Déclenche le seed d'une API spécifique.
-    
-    **Auth:** JWT Bearer (role admin requise)
-    **Audit:** Action enregistrée avec user_id
-    
-    **Réponse 200:** Seed déclenché (ou données déjà présentes)
-    **Réponse 404:** Seed non disponible pour cette API
-    **Réponse 500:** Erreur lors du seed
+    """Trigger the seed of a specific API.
+
+    **Auth:** JWT Bearer (admin role required)
+    **Audit:** Action logged with user_id
+
+    **200 response:** Seed triggered (or data already present)
+    **404 response:** Seed not available for this API
+    **500 response:** Error during the seed
     """
     available = _discover_seedable_apis()
     if api_name not in available:
-        _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "failed", 
+        _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "failed",
                    "API not seedable")
         raise HTTPException(
             status_code=404,
-            detail=f"API '{api_name}' n'a pas de seed disponible"
+            detail=f"API '{api_name}' has no seed available"
         )
 
     try:
         seeded = await seed_api(api_name, db)
         if seeded:
             await db.commit()
-            _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "success", 
+            _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "success",
                        "seed executed")
-            logger.info("🌱 Seed '%s' déclenché via API admin par user %s", api_name, current_user.id)
+            logger.info("🌱 Seed '%s' triggered via admin API by user %s", api_name, current_user.id)
             return {
                 "data": {
                     "api": api_name,
                     "seeded": True,
-                    "message": "Seed exécuté avec succès",
+                    "message": "Seed executed successfully",
                     "timestamp": datetime.utcnow().isoformat(),
                 },
                 "message": "ok",
             }
         else:
-            _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "noop", 
+            _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "noop",
                        "data already present")
             return {
                 "data": {
                     "api": api_name,
                     "seeded": False,
-                    "message": "Données déjà présentes — aucune action",
+                    "message": "Data already present — no action taken",
                     "timestamp": datetime.utcnow().isoformat(),
                 },
                 "message": "ok",
             }
     except Exception as e:
-        _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "error", 
+        _log_audit(str(current_user.id), "POST", f"/-/api/seeds/{api_name}", "error",
                    f"exception: {str(e)}")
-        logger.exception("Erreur seed '%s' via API admin", api_name)
+        logger.exception("Error in seed '%s' via admin API", api_name)
         raise HTTPException(
             status_code=500,
-            detail=f"Erreur lors du seed '{api_name}': {str(e)}"
+            detail=f"Error running seed '{api_name}': {str(e)}"
         )
 
 
@@ -186,13 +186,13 @@ async def trigger_seed(
 # ---------------------------------------------------------------------------
 
 class TableResetRequest(BaseModel):
-    """Corps de la requête de réinitialisation de tables.
+    """Body of the table reset request.
 
-    Deux modes :
-    - ``tables`` : liste explicite de noms de tables SQL (ex: ``["eve_events", "eve_rsvps"]``)
-    - ``api`` : nom d'une API (ex: ``"eve"``), qui auto-découvre ses tables via son ``models.py``
+    Two modes:
+    - ``tables``: explicit list of SQL table names (e.g. ``["eve_events", "eve_rsvps"]``)
+    - ``api``: name of an API (e.g. ``"eve"``), which auto-discovers its tables via its ``models.py``
 
-    Les deux peuvent être combinés. ``seed`` déclenche le seed après la remise à zéro.
+    Both can be combined. ``seed`` triggers the seed after the reset.
     """
 
     tables: list[str] | None = None
@@ -201,15 +201,15 @@ class TableResetRequest(BaseModel):
 
 
 def _discover_api_tables(api_name: str) -> list[str]:
-    """Importe les modèles d'une API et retourne les noms de tables SQLModel associées.
+    """Imports the models of an API and returns the associated SQLModel table names.
 
-    L'import force l'enregistrement des tables dans ``SQLModel.metadata``.
+    The import forces the tables to be registered in ``SQLModel.metadata``.
     """
     module_path = f"apis.{api_name}.models"
     try:
         importlib.import_module(module_path)
     except ModuleNotFoundError as e:
-        raise ValueError(f"Module '{module_path}' introuvable : {e}") from e
+        raise ValueError(f"Module '{module_path}' not found: {e}") from e
 
     prefix = f"{api_name}_"
     return [
@@ -224,20 +224,20 @@ async def reset_tables(
     current_user: User = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Réinitialise (DROP + CREATE) les tables spécifiées.
+    """Reset (DROP + CREATE) the specified tables.
 
-    **⚠️ Destructif — toutes les données des tables concernées seront perdues.**
+    **⚠️ Destructive — all data in the affected tables will be lost.**
 
-    **Auth:** JWT Bearer (role admin)
-    **Audit:** Action enregistrée
+    **Auth:** JWT Bearer (admin role)
+    **Audit:** Action logged
 
-    Deux modes de sélection des tables :
-    - `tables` : liste explicite de noms SQL (`["eve_events", "eve_rsvps"]`)
-    - `api` : nom d'une API (`"eve"`) → auto-découverte de ses tables via `models.py`
+    Two table-selection modes:
+    - `tables`: explicit list of SQL names (`["eve_events", "eve_rsvps"]`)
+    - `api`: name of an API (`"eve"`) → auto-discovery of its tables via `models.py`
 
-    Les deux peuvent être combinés. `seed` (bool, défaut `false`) relance le seed après reset.
+    Both can be combined. `seed` (bool, default `false`) re-runs the seed after the reset.
 
-    **Exemple :**
+    **Example:**
     ```json
     { "api": "eve", "seed": true }
     ```
@@ -245,10 +245,10 @@ async def reset_tables(
     if not body.tables and not body.api:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Fournir au moins 'tables' (noms SQL) ou 'api' (nom de l'API)",
+            detail="Provide at least 'tables' (SQL names) or 'api' (API name)",
         )
 
-    # 1. Résoudre la liste finale de noms de tables
+    # 1. Resolve the final list of table names
     table_names: set[str] = set(body.tables or [])
 
     if body.api:
@@ -260,17 +260,17 @@ async def reset_tables(
         if not discovered:
             raise HTTPException(
                 status_code=404,
-                detail=f"Aucune table trouvée pour l'API '{body.api}'"
-                       " (les tables doivent porter le préfixe '{body.api}_')",
+                detail=f"No table found for API '{body.api}'"
+                       " (tables must use the prefix '{body.api}_')",
             )
         table_names.update(discovered)
 
-    # 2. Vérifier que toutes les tables sont connues de SQLModel.metadata
+    # 2. Check that all tables are known to SQLModel.metadata
     unknown = table_names - set(SQLModel.metadata.tables.keys())
     if unknown:
         raise HTTPException(
             status_code=404,
-            detail=f"Tables inconnues (non enregistrées dans SQLModel.metadata) : {sorted(unknown)}",
+            detail=f"Unknown tables (not registered in SQLModel.metadata): {sorted(unknown)}",
         )
 
     sorted_tables = sorted(table_names)
@@ -279,25 +279,25 @@ async def reset_tables(
         f"tables={sorted_tables} seed={body.seed}",
     )
     logger.warning(
-        "🗑️  Réinitialisation tables %s demandée par %s (seed=%s)",
+        "🗑️  Reset of tables %s requested by %s (seed=%s)",
         sorted_tables, current_user.email, body.seed,
     )
 
-    # 3. DROP puis CREATE via le moteur SQLAlchemy (DDL hors session)
+    # 3. DROP then CREATE via the SQLAlchemy engine (DDL outside session)
     engine = _get_engine()
     dropped: list[str] = []
     created: list[str] = []
 
     try:
         async with engine.begin() as conn:
-            # DROP dans l'ordre inverse (FKs)
+            # DROP in reverse order (FKs)
             for name in reversed(sorted_tables):
                 table = SQLModel.metadata.tables[name]
                 await conn.run_sync(lambda sync_conn, t=table: t.drop(sync_conn, checkfirst=True))
                 dropped.append(name)
                 logger.info("  ✅ DROP %s", name)
 
-            # CREATE dans l'ordre normal
+            # CREATE in normal order
             for name in sorted_tables:
                 table = SQLModel.metadata.tables[name]
                 await conn.run_sync(lambda sync_conn, t=table: t.create(sync_conn, checkfirst=True))
@@ -309,31 +309,31 @@ async def reset_tables(
             str(current_user.id), "POST", "/-/api/tables/reset", "error",
             f"tables={sorted_tables} exception={e}",
         )
-        logger.exception("Erreur DDL sur tables %s", sorted_tables)
-        raise HTTPException(status_code=500, detail=f"Erreur DDL : {e}")
+        logger.exception("DDL error on tables %s", sorted_tables)
+        raise HTTPException(status_code=500, detail=f"DDL error: {e}")
 
-    # 4. Seed optionnel
+    # 4. Optional seed
     seeded = False
     seed_detail = None
     if body.seed and not body.api:
-        seed_detail = "Seed ignoré : 'api' requis pour déclencher un seed automatique"
+        seed_detail = "Seed skipped: 'api' is required to trigger an automatic seed"
     elif body.seed and body.api:
         available = _discover_seedable_apis()
         if body.api not in available:
-            seed_detail = f"Seed ignoré : pas de seed.py pour l'API '{body.api}'"
+            seed_detail = f"Seed skipped: no seed.py for API '{body.api}'"
             logger.warning(seed_detail)
         else:
             try:
                 seeded = await seed_api(body.api, db)
                 if seeded:
                     await db.commit()
-                    seed_detail = "Seed exécuté avec succès"
-                    logger.info("🌱 Seed '%s' exécuté après reset", body.api)
+                    seed_detail = "Seed executed successfully"
+                    logger.info("🌱 Seed '%s' executed after reset", body.api)
                 else:
-                    seed_detail = "Seed : aucune donnée insérée (déjà présentes ?)"
+                    seed_detail = "Seed: no data inserted (already present?)"
             except Exception as e:
-                seed_detail = f"Erreur seed : {e}"
-                logger.exception("Erreur seed '%s' après reset tables", body.api)
+                seed_detail = f"Seed error: {e}"
+                logger.exception("Error in seed '%s' after table reset", body.api)
 
     _log_audit(
         str(current_user.id), "POST", "/-/api/tables/reset", "success",
@@ -348,7 +348,7 @@ async def reset_tables(
             "seed_detail": seed_detail,
             "timestamp": datetime.utcnow().isoformat(),
         },
-        "message": "Tables réinitialisées avec succès",
+        "message": "Tables reset successfully",
     }
 
 
@@ -360,23 +360,23 @@ async def reset_tables(
 async def trigger_backup(
     current_user: User = Depends(_require_admin),
 ) -> dict[str, Any]:
-    """Déclenche un backup complet de la base de données et l'uploade sur S3.
+    """Trigger a full database backup and upload it to S3.
 
-    **Auth:** JWT Bearer (role admin)
-    **Audit:** Action enregistrée
+    **Auth:** JWT Bearer (admin role)
+    **Audit:** Action logged
 
-    Lit toutes les tables via SQLAlchemy (pas de pg_dump requis),
-    sérialise en JSON, compresse en gzip et uploade sur le bucket S3 configuré.
+    Reads all tables via SQLAlchemy (no pg_dump required),
+    serializes to JSON, compresses to gzip and uploads to the configured S3 bucket.
 
-    **Réponse 200:** Backup créé — retourne clé S3, taille, timestamp
-    **Réponse 503:** Backup non configuré (variables S3_* manquantes)
-    **Réponse 500:** Erreur lors du backup
+    **200 response:** Backup created — returns S3 key, size, timestamp
+    **503 response:** Backup not configured (missing S3_* variables)
+    **500 response:** Error during the backup
     """
     settings = get_settings()
     if not settings.backup_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Backup non configuré — variables S3_ENDPOINT_URL, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET_NAME requises",
+            detail="Backup not configured — S3_ENDPOINT_URL, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET_NAME variables required",
         )
 
     try:
@@ -386,29 +386,29 @@ async def trigger_backup(
             str(current_user.id), "POST", "/-/api/backup", "success",
             f"key={result['key']} rows={result['rows']} size={result['size_bytes']}",
         )
-        return {"data": result, "message": "Backup créé avec succès"}
+        return {"data": result, "message": "Backup created successfully"}
     except Exception as e:
         _log_audit(str(current_user.id), "POST", "/-/api/backup", "error", str(e))
-        logger.exception("Erreur backup")
-        raise HTTPException(status_code=500, detail=f"Erreur backup : {e}")
+        logger.exception("Backup error")
+        raise HTTPException(status_code=500, detail=f"Backup error: {e}")
 
 
 @router.get("/backups")
 async def list_available_backups(
     current_user: User = Depends(_require_admin),
 ) -> dict[str, Any]:
-    """Liste les backups disponibles dans le bucket S3.
+    """List the backups available in the S3 bucket.
 
-    **Auth:** JWT Bearer (role admin)
+    **Auth:** JWT Bearer (admin role)
 
-    Retourne la liste triée du plus récent au plus ancien,
-    avec clé S3, taille en octets et date de dernière modification.
+    Returns the list sorted from most recent to oldest,
+    with S3 key, size in bytes and last-modified date.
     """
     settings = get_settings()
     if not settings.backup_enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Backup non configuré — variables S3_* manquantes",
+            detail="Backup not configured — missing S3_* variables",
         )
 
     try:
@@ -418,5 +418,5 @@ async def list_available_backups(
             "message": "ok",
         }
     except Exception as e:
-        logger.exception("Erreur listing backups")
-        raise HTTPException(status_code=500, detail=f"Erreur listing : {e}")
+        logger.exception("Error listing backups")
+        raise HTTPException(status_code=500, detail=f"Listing error: {e}")

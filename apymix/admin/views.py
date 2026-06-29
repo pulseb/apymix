@@ -1,7 +1,7 @@
-"""Vues ModelAdmin du socle PAPI — CRUD auto-généré pour les modèles partagés.
+"""ModelAdmin views of the Apymix core — auto-generated CRUD for shared models.
 
-Les admin views des APIs métier sont dans leurs propres modules
-(ex : apis/eve/admin.py) et découvertes automatiquement par setup.py.
+The admin views of business APIs live in their own modules
+(e.g. apis/eve/admin.py) and are discovered automatically by setup.py.
 """
 
 import logging
@@ -21,12 +21,12 @@ from apymix.scripts.db_init import seed_api
 
 logger = logging.getLogger(__name__)
 
-# Templates Jinja2 pour les pages de feedback admin
+# Jinja2 templates for admin feedback pages
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 def _short_uuid(model, name):
-    """Formate un UUID en affichant seulement la première section (8 car.)."""
+    """Formats a UUID by displaying only the first section (8 chars)."""
     value = getattr(model, name, None)
     if value is None:
         return ""
@@ -34,11 +34,11 @@ def _short_uuid(model, name):
 
 
 def _seed_key_from_app(app: AppEntry) -> str | None:
-    """Déduit la clé de seed d'une AppEntry API.
+    """Derives the seed key of an API AppEntry.
 
-    Le seed est indexé par le nom de dossier sous ``apis/`` (ex: ``eve``),
-    alors que ``AppEntry.name`` peut contenir un nom métier (ex: ``Eve-API``).
-    On se base donc sur le préfixe canonique ``/api/<key>``.
+    The seed is indexed by the folder name under ``apis/`` (e.g. ``eve``),
+    while ``AppEntry.name`` may contain a business name (e.g. ``Eve-API``).
+    We therefore rely on the canonical prefix ``/api/<key>``.
     """
     if app.app_type != "api":
         return None
@@ -50,7 +50,7 @@ def _seed_key_from_app(app: AppEntry) -> str | None:
 
 
 class AppEntryAdmin(ModelView, model=AppEntry):
-    """Admin view pour le registre des applications."""
+    """Admin view for the application registry."""
 
     column_list = [
         AppEntry.id,
@@ -73,12 +73,12 @@ class AppEntryAdmin(ModelView, model=AppEntry):
     name = "Application"
     name_plural = "Applications"
     icon = "fa-solid fa-cubes"
-    category = "PAPI"
+    category = "Apymix"
 
     @action(
         name="seed_api",
-        label="Lancer seed API",
-        confirmation_message="Lancer le seed pour les applications API sélectionnées ?",
+        label="Run API seed",
+        confirmation_message="Run the seed for the selected API applications?",
         add_in_list=True,
         add_in_detail=True,
     )
@@ -110,41 +110,41 @@ class AppEntryAdmin(ModelView, model=AppEntry):
                     continue
                 seed_key = _seed_key_from_app(app)
                 if not seed_key:
-                    error_apps.append(f"{app.name} (clé seed introuvable)")
+                    error_apps.append(f"{app.name} (seed key not found)")
                     continue
                 if await seed_api(seed_key, session):
                     seeded_apps.append(app.name)
                 else:
-                    skipped_apps.append(f"{app.name} (DB déjà peuplée)")
+                    skipped_apps.append(f"{app.name} (DB already populated)")
 
             if seeded_apps:
                 await session.commit()
 
-        logger.info("Seed action SQLAdmin : seedées=%s, ignorées=%s, erreurs=%s", 
+        logger.info("SQLAdmin seed action: seeded=%s, skipped=%s, errors=%s",
                    seeded_apps, skipped_apps, error_apps)
 
-        # Message de feedback
+        # Feedback message
         if seeded_apps:
             icon = "✅"
-            message = f"Seed réussi pour {len(seeded_apps)} API(s) : {', '.join(seeded_apps)}"
+            message = f"Seed succeeded for {len(seeded_apps)} API(s): {', '.join(seeded_apps)}"
             if skipped_apps or error_apps:
                 details = []
                 if skipped_apps:
-                    details.append(f"{len(skipped_apps)} ignorée(s) : {', '.join(skipped_apps)}")
+                    details.append(f"{len(skipped_apps)} skipped: {', '.join(skipped_apps)}")
                 if error_apps:
-                    details.append(f"{len(error_apps)} erreur(s) : {', '.join(error_apps)}")
+                    details.append(f"{len(error_apps)} error(s): {', '.join(error_apps)}")
                 message += f"<br><small>{' | '.join(details)}</small>"
         elif error_apps:
             icon = "⚠️"
-            message = f"Erreur : {', '.join(error_apps)}"
+            message = f"Error: {', '.join(error_apps)}"
             if skipped_apps:
-                message += f"<br><small>{len(skipped_apps)} ignorée(s) : {', '.join(skipped_apps)}</small>"
+                message += f"<br><small>{len(skipped_apps)} skipped: {', '.join(skipped_apps)}</small>"
         elif skipped_apps:
             icon = "ℹ️"
-            message = f"Aucune donnée seedée — {', '.join(skipped_apps)}"
+            message = f"No data seeded — {', '.join(skipped_apps)}"
         else:
             icon = "⚠️"
-            message = "Aucune application sélectionnée."
+            message = "No application selected."
 
         return templates.TemplateResponse(
             request, "seed_feedback.html", {"icon": icon, "message": message, "referer": referer}
@@ -153,7 +153,7 @@ class AppEntryAdmin(ModelView, model=AppEntry):
     @action(
         name="toggle_status",
         label="Toggle Status",
-        confirmation_message="Inverser le statut (active ↔ inactive) ?",
+        confirmation_message="Toggle the status (active ↔ inactive)?",
         add_in_list=True,
         add_in_detail=True,
     )
@@ -167,10 +167,10 @@ class AppEntryAdmin(ModelView, model=AppEntry):
             except ValueError:
                 continue
         referer = request.headers.get("referer") or str(request.url_for("admin:list", identity=self.identity))
-        
+
         if not pks:
             return RedirectResponse(referer, status_code=302)
-        
+
         engine = _get_engine()
         async with AsyncSession(engine) as session:
             result = await session.execute(select(AppEntry).where(AppEntry.id.in_(pks)))
@@ -178,13 +178,13 @@ class AppEntryAdmin(ModelView, model=AppEntry):
             for app in apps:
                 app.status = "inactive" if app.status == "active" else "active"
             await session.commit()
-        
+
         return RedirectResponse(referer, status_code=302)
 
     @action(
         name="toggle_docs",
         label="Toggle Docs",
-        confirmation_message="Inverser l'activation de la documentation ?",
+        confirmation_message="Toggle the documentation activation?",
         add_in_list=True,
         add_in_detail=True,
     )
@@ -198,10 +198,10 @@ class AppEntryAdmin(ModelView, model=AppEntry):
             except ValueError:
                 continue
         referer = request.headers.get("referer") or str(request.url_for("admin:list", identity=self.identity))
-        
+
         if not pks:
             return RedirectResponse(referer, status_code=302)
-        
+
         engine = _get_engine()
         async with AsyncSession(engine) as session:
             result = await session.execute(select(AppEntry).where(AppEntry.id.in_(pks)))
@@ -209,12 +209,12 @@ class AppEntryAdmin(ModelView, model=AppEntry):
             for app in apps:
                 app.docs_enabled = not app.docs_enabled
             await session.commit()
-        
+
         return RedirectResponse(referer, status_code=302)
 
 
 class UserAdmin(ModelView, model=User):
-    """Admin view pour les utilisateurs."""
+    """Admin view for users."""
 
     column_list = [User.id, User.email, User.display_name, User.roles, User.status, User.is_email_verified, User.created_at]
     column_searchable_list = [User.email, User.display_name]
@@ -225,21 +225,21 @@ class UserAdmin(ModelView, model=User):
     form_excluded_columns = ["accounts", "created_at", "updated_at", "last_login_at"]
     column_details_exclude_list = ["accounts"]
 
-    name = "Utilisateur"
-    name_plural = "Utilisateurs"
+    name = "User"
+    name_plural = "Users"
     icon = "fa-solid fa-user"
-    category = "PAPI"
+    category = "Apymix"
 
 
 class RedirectAdmin(ModelView, model=Redirect):
-    """Admin view pour les règles de redirection HTTP."""
+    """Admin view for HTTP redirect rules."""
 
     column_list = [Redirect.id, Redirect.host, Redirect.path_prefix, Redirect.destination, Redirect.status_code, Redirect.enabled]
     column_searchable_list = [Redirect.host, Redirect.destination]
     column_sortable_list = [Redirect.host, Redirect.status_code, Redirect.enabled]
     column_default_sort = ("id", False)
 
-    name = "Redirection"
-    name_plural = "Redirections"
+    name = "Redirect"
+    name_plural = "Redirects"
     icon = "fa-solid fa-route"
-    category = "PAPI"
+    category = "Apymix"

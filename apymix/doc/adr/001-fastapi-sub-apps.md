@@ -1,48 +1,48 @@
-# ADR-001 : FastAPI comme dispatcher et framework API
+# ADR-001 : FastAPI as Dispatcher and API Framework
 
-**Statut :** Accepté
-**Date :** 2026-02-24
+**Status:** Accepted
+**Date:** 2026-02-24
 
-## Contexte
+## Context
 
-PAPI doit servir plusieurs APIs sous un même serveur. Chaque API doit avoir son propre schéma OpenAPI. Deux approches principales sont envisagées pour le dispatch des requêtes vers les sous-applications.
+Apymix must serve multiple APIs under a single server. Each API must have its own OpenAPI schema. Two main approaches are considered for dispatching requests to sub-applications.
 
-## Options envisagées
+## Considered options
 
 ### Option A : Starlette (main) + FastAPI (sub-apps)
 
-Utiliser Starlette pur pour l'application principale (dispatch uniquement) et FastAPI pour chaque sub-app métier.
+Use pure Starlette for the main application (dispatch only) and FastAPI for each business sub-app.
 
-- **Avantages :** App principale plus légère, séparation claire des responsabilités
-- **Inconvénients :** Pas de validation ni de docs OpenAPI sur les routes principales (health, auth). Deux frameworks à maîtriser. Configuration des middleware différente.
+- **Pros:** Lighter main app, clear separation of responsibilities
+- **Cons:** No validation or OpenAPI docs on main routes (health, auth). Two frameworks to master. Middleware configuration differs.
 
-### Option B : FastAPI partout (main + sub-apps)
+### Option B : FastAPI everywhere (main + sub-apps)
 
-Utiliser FastAPI comme application principale ET pour chaque sub-app.
+Use FastAPI as the main application AND for each sub-app.
 
-- **Avantages :** API cohérente partout (validation, docs, dependency injection). Un seul framework. Les routes globales (auth, health) bénéficient aussi d'OpenAPI. FastAPI est construit SUR Starlette, donc pas de surcoût réel.
-- **Inconvénients :** Légèrement plus de dépendances importées sur l'app principale (négligeable).
+- **Pros:** Consistent API everywhere (validation, docs, dependency injection). A single framework. Global routes (auth, health) also benefit from OpenAPI. FastAPI is built ON Starlette, so there's no real overhead.
+- **Cons:** Slightly more dependencies imported in the main app (negligible).
 
-## Décision
+## Decision
 
-**Option B : FastAPI partout.**
+**Option B: FastAPI everywhere.**
 
-FastAPI est une surcouche de Starlette sans overhead significatif. Utiliser FastAPI comme app principale permet :
-- D'avoir les routes d'auth et de health documentées dans OpenAPI
-- D'utiliser le même système de dependency injection partout
-- De simplifier la maintenance (un seul framework)
+FastAPI is a thin layer over Starlette with no significant overhead. Using FastAPI as the main app allows us to:
+- Have auth and health routes documented in OpenAPI
+- Use the same dependency injection system everywhere
+- Simplify maintenance (a single framework)
 
-Le montage de sub-apps via `app.mount("/prefix", sub_app)` donne automatiquement un schéma OpenAPI séparé par sub-app.
+Mounting sub-apps via `app.mount("/prefix", sub_app)` automatically yields a separate OpenAPI schema per sub-app.
 
-## Conséquences
+## Consequences
 
-### Positives
-- Cohérence technique sur tout le projet
-- Documentation OpenAPI complète (y compris auth et health)
-- Courbe d'apprentissage réduite
+### Positive
+- Technical consistency across the project
+- Complete OpenAPI documentation (including auth and health)
+- Reduced learning curve
 
-### Négatives
-- Si le module `papi` est open-sourcé, il embarque FastAPI comme dépendance (mais c'est déjà le cas de facto)
+### Negative
+- If the `apymix` module is open-sourced, it ships FastAPI as a dependency (which is already de facto the case)
 
-### Risques
-- Aucun risque identifié. FastAPI est le standard de facto pour les APIs Python modernes.
+### Risks
+- No risks identified. FastAPI is the de facto standard for modern Python APIs.

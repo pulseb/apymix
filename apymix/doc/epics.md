@@ -1,79 +1,79 @@
-# Epics — PAPI
+# Epics — Apymix
 
-## EPIC-01 : Socle technique PAPI
+## EPIC-01 : Apymix Technical Core
 
-**Objectif :** Créer le module technique réutilisable qui permet de monter et servir plusieurs sub-apps FastAPI avec authentification, base de données et configuration partagées.
+**Objective:** Build the reusable technical module that lets us mount and serve several FastAPI sub-apps with shared authentication, database, and configuration.
 
-**Personas concernés :** Développeur, Administrateur
+**Personas:** Developer, Administrator
 
-**Critères de succès :**
-- Un développeur peut ajouter une nouvelle API en créant un dossier dans `apis/` et en l'enregistrant dans l'app factory
-- Chaque sub-app a son propre schéma OpenAPI accessible
-- L'authentification JWT est fonctionnelle et partagée entre les APIs
-- La base de données fonctionne en SQLite (dev) et PostgreSQL (prod) sans changement de code métier
-- Les middleware (CORS, logging, errors) sont appliqués globalement
+**Success criteria:**
+- A developer can add a new API by creating a folder and registering it in the app factory
+- Each sub-app has its own OpenAPI schema
+- JWT authentication is functional and shared between APIs
+- The database works on SQLite (dev) and PostgreSQL (prod) with no business code changes
+- Middleware (CORS, logging, errors) is applied globally
 
-**User Stories rattachées :** US-001, US-002, US-003, US-004, US-005, US-006
-
----
-
-## EPIC-04 : Déploiement & Infrastructure
-
-**Objectif :** Mettre en place l'infrastructure de déploiement pour que PAPI soit accessible en production de manière sécurisée.
-
-**Personas concernés :** Développeur, Administrateur
-
-**Critères de succès :**
-- L'application peut être lancée localement avec une seule commande
-- L'application peut être déployée via Docker / docker-compose
-- La configuration est gérée par variables d'environnement
-- HTTPS est en place en production
-
-**User Stories rattachées :** US-016, US-017, US-018
+**Related user stories:** US-001, US-002, US-003, US-004, US-005, US-006
 
 ---
 
-## EPIC-05 : Opérations admin & qualité
+## EPIC-04 : Deployment & Infrastructure
 
-**Objectif :** Faciliter l'exploitation quotidienne du backend et garantir un socle de tests automatisés sur les fonctionnalités critiques.
+**Objective:** Set up the deployment infrastructure so that Apymix can be securely accessed in production.
 
-**Personas concernés :** Développeur, Administrateur
+**Personas:** Developer, Administrator
 
-**Critères de succès :**
-- Un admin authentifié peut déclencher manuellement le seed d'une API depuis le backend
-- Les endpoints critiques disposent de tests `pytest`
-- Les tests peuvent être lancés localement via `uv run pytest`
+**Success criteria:**
+- The app can be launched locally with a single command
+- The app can be deployed via Docker / docker-compose
+- Configuration is managed via environment variables
+- HTTPS is in place in production
 
-**User Stories rattachées :** US-019, US-020
-
----
-
-## EPIC-06 : Authentification fédérée (OIDC)
-
-**Objectif :** Ajouter une authentification SSO standard OIDC pour simplifier l'accès administrateur sans gérer de mots de passe locaux supplémentaires.
-
-**Personas concernés :** Administrateur, Développeur
-
-**Critères de succès :**
-- Un administrateur peut se connecter via Google OIDC
-- L'application conserve un mode JWT interne après authentification OIDC
-- Les comptes OIDC sont reliés à un utilisateur interne avec rôle (`admin`/`user`)
-- La configuration se fait par variables d'environnement (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`)
-
-**User Stories rattachées :** US-021, US-022
+**Related user stories:** US-016, US-017, US-018
 
 ---
 
-## EPIC-07 : Images profilées par application
+## EPIC-05 : Admin Operations & Quality
 
-**Objectif :** Produire des images Docker ciblées par application (ex: `eve:latest`) tout en conservant une image `all-in-one` pour les environnements de test.
+**Objective:** Streamline day-to-day backend operations and ensure a baseline of automated tests for the critical features.
 
-**Personas concernés :** Développeur, Administrateur
+**Personas:** Developer, Administrator
 
-**Critères de succès :**
-- Un build peut cibler un profil (`all`, `eve`, `kif`)
-- Le profil détermine les APIs/fronts inclus et activés
-- Le mode mono-front peut servir l'application sur `/` (sans préfixe)
-- Le processus de build reste KISS (une commande principale)
+**Success criteria:**
+- An authenticated admin can manually trigger the seed of an API from the backend
+- Critical endpoints have `pytest` coverage
+- Tests can be run locally via `uv run pytest`
 
-**User Stories rattachées :** US-023, US-024, US-025
+**Related user stories:** US-019, US-020
+
+---
+
+## EPIC-06 : Federated Authentication (OIDC)
+
+**Objective:** Add a standard OIDC SSO authentication to simplify admin access without managing additional local passwords.
+
+**Personas:** Administrator, Developer
+
+**Success criteria:**
+- An administrator can sign in via Google OIDC
+- The application retains an internal JWT mode after OIDC authentication
+- OIDC accounts are linked to an internal user with a role (`admin`/`user`)
+- Configuration is done via environment variables (`OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`)
+
+**Related user stories:** US-021, US-022
+
+---
+
+## EPIC-07 : Per-Application Profiled Images
+
+**Objective:** Produce targeted Docker images per application (e.g. `eve:latest`) while keeping an `all-in-one` image for test environments.
+
+**Personas:** Developer, Administrator
+
+**Success criteria:**
+- A build can target a profile (`all`, `eve`, `kif`)
+- The profile determines which APIs/fronts are included and enabled
+- Mono-front mode can serve the application at `/` (no prefix)
+- The build process stays KISS (one main command)
+
+**Related user stories:** US-023, US-024, US-025

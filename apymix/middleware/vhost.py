@@ -32,7 +32,7 @@ class VHostMiddleware:
 
     @staticmethod
     def _get_host(scope: dict) -> str:
-        """Extrait le hostname (sans port) depuis les headers ASGI."""
+        """Extracts the hostname (without port) from the ASGI headers."""
         for name, value in scope.get("headers", []):
             if name == b"host":
                 return value.decode("latin-1").split(":")[0]

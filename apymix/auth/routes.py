@@ -1,4 +1,4 @@
-"""Routes d'authentification — login, refresh, user info, api_token."""
+"""Authentication routes — login, refresh, user info, api_token."""
 
 import secrets
 from datetime import datetime, timezone
@@ -26,7 +26,7 @@ def _build_token_data(user: User) -> dict:
 
 
 async def _get_user_read_with_api_token(user: User, db: AsyncSession) -> UserRead:
-    """Construit un UserRead avec le champ api_token renseigné si présent."""
+    """Builds a UserRead with the api_token field populated when present."""
     result = await db.execute(
         select(UserAccount).where(
             UserAccount.user_id == user.id,
@@ -41,7 +41,7 @@ async def _get_user_read_with_api_token(user: User, db: AsyncSession) -> UserRea
 
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Authentification par email + mot de passe → JWT."""
+    """Email + password authentication → JWT."""
     result = await db.execute(
         select(UserAccount).where(
             UserAccount.provider == "password",
@@ -53,14 +53,14 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if account is None or not verify_password(body.password, account.password_hash or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
+            detail="Incorrect email or password",
         )
 
     user = await db.get(User, account.user_id)
     if user is None or user.status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Compte désactivé ou supprimé",
+            detail="Account disabled or deleted",
         )
 
     user.last_login_at = _utcnow()
@@ -80,7 +80,7 @@ async def login_oauth2_form(
     form: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
-    """OAuth2 password flow pour Swagger UI — le champ 'username' correspond à l'email."""
+    """OAuth2 password flow for Swagger UI — the 'username' field corresponds to the email."""
     result = await db.execute(
         select(UserAccount).where(
             UserAccount.provider == "password",
@@ -92,14 +92,14 @@ async def login_oauth2_form(
     if account is None or not verify_password(form.password, account.password_hash or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
+            detail="Incorrect email or password",
         )
 
     user = await db.get(User, account.user_id)
     if user is None or user.status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Compte désactivé ou supprimé",
+            detail="Account disabled or deleted",
         )
 
     settings = get_settings()  # noqa: F841 — used via dict spread below
@@ -111,19 +111,19 @@ async def login_oauth2_form(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: TokenRefreshRequest, db: AsyncSession = Depends(get_db)):
-    """Renouvellement du token d'accès via refresh token."""
+    """Refresh of the access token via a refresh token."""
     try:
         payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Token type invalide")
+            raise HTTPException(status_code=401, detail="Invalid token type")
     except Exception:
-        raise HTTPException(status_code=401, detail="Refresh token invalide ou expiré")
+        raise HTTPException(status_code=401, detail="Refresh token invalid or expired")
 
     result = await db.execute(select(User).where(User.email == payload.get("email")))
     user = result.scalar_one_or_none()
 
     if user is None or user.status != "active":
-        raise HTTPException(status_code=401, detail="Utilisateur introuvable ou désactivé")
+        raise HTTPException(status_code=401, detail="User not found or disabled")
 
     settings = get_settings()
     return TokenResponse(
@@ -138,7 +138,7 @@ async def me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retourne les informations de l'utilisateur connecté."""
+    """Returns the information of the logged-in user."""
     return await _get_user_read_with_api_token(current_user, db)
 
 
@@ -147,10 +147,10 @@ async def generate_api_token(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Génère (ou régénère) un api_token statique pour l'utilisateur connecté.
+    """Generates (or regenerates) a static api_token for the logged-in user.
 
-    Ce token peut être utilisé comme Bearer token à la place du JWT
-    pour des intégrations simples (scripts, frontends légers).
+    This token can be used as a Bearer token instead of a JWT
+    for simple integrations (scripts, lightweight frontends).
     """
     result = await db.execute(
         select(UserAccount).where(
@@ -183,7 +183,7 @@ async def revoke_api_token(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Révoque l'api_token de l'utilisateur connecté."""
+    """Revokes the api_token of the logged-in user."""
     result = await db.execute(
         select(UserAccount).where(
             UserAccount.user_id == current_user.id,

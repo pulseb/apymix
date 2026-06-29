@@ -1,4 +1,4 @@
-"""Point d'entrée CLI : `uv run apymix` lance uvicorn avec la config depuis l'environnement."""
+"""CLI entry point: `uv run apymix` launches uvicorn with config from environment variables."""
 
 import argparse
 import os
@@ -7,12 +7,12 @@ import uvicorn
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Lance le serveur Apymix")
-    parser.add_argument("--host", default=os.getenv("HOST", "0.0.0.0"), help="Adresse d'écoute")
-    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8000")), help="Port d'écoute")
+    parser = argparse.ArgumentParser(description="Launch the Apymix server")
+    parser.add_argument("--host", default=os.getenv("HOST", "0.0.0.0"), help="Bind address")
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8000")), help="Bind port")
     parser.add_argument("--reload", action="store_true", default=os.getenv("ENV", "production") == "development", help="Hot reload (dev)")
-    parser.add_argument("--workers", type=int, default=int(os.getenv("WORKERS", "1")), help="Nombre de workers (incompatible avec --reload)")
-    parser.add_argument("--seed", action="store_true", help="Réinitialise la BDD et rejoue le seed")
+    parser.add_argument("--workers", type=int, default=int(os.getenv("WORKERS", "1")), help="Number of workers (incompatible with --reload)")
+    parser.add_argument("--seed", action="store_true", help="Reset the database and replay the seed")
     args = parser.parse_args()
 
     if args.seed:

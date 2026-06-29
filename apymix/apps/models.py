@@ -1,4 +1,4 @@
-"""Modèle AppEntry — registre des applications découvertes par PulseApps."""
+"""AppEntry model — registry of applications discovered by PulseApps."""
 
 import uuid
 from datetime import datetime
@@ -10,7 +10,7 @@ from apymix.db.models import TimestampMixin, _utcnow, _TABLE_PREFIX
 
 
 class AppStatus(str, Enum):
-    """Statuts possibles d'une application."""
+    """Possible application statuses."""
 
     active = "active"
     disabled = "disabled"
@@ -18,26 +18,25 @@ class AppStatus(str, Enum):
 
 
 class AppType(str, Enum):
-    """Types d'application."""
+    """Application types."""
 
     api = "api"
     front = "front"
 
 
 class AppEntry(TimestampMixin, table=True):
-    """Table de registre des applications découvertes.
+    """Registry table for discovered applications.
 
-    À chaque démarrage, le système scanne */amx.yaml puis synchronise
-    cette table : les nouvelles apps sont insérées en 'active', celles qui
-    ont disparu passent en 'unavailable', celles désactivées manuellement
-    restent en 'disabled'.
+    At every startup, the system scans */amx.yaml and then syncs this table:
+    new apps are inserted with status 'active', missing ones are switched
+    to 'unavailable', and those manually disabled stay at 'disabled'.
     """
 
     __tablename__ = f"{_TABLE_PREFIX}apps"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str = Field(max_length=100, unique=True, index=True)
-    app_type: str = Field(max_length=10)  # "api" ou "front"
+    app_type: str = Field(max_length=10)  # "api" or "front"
     prefix: str = Field(max_length=100)
     status: str = Field(default=AppStatus.active.value, max_length=20)
     docs_enabled: bool = Field(default=True)
@@ -47,7 +46,7 @@ class AppEntry(TimestampMixin, table=True):
 
 
 class AppEntryRead(SQLModel):
-    """Schéma de lecture d'une AppEntry."""
+    """Read schema for an AppEntry."""
 
     id: uuid.UUID
     name: str

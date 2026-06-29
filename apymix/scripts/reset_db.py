@@ -1,9 +1,9 @@
-"""Script de reset — supprime et recrée la BDD (SQLite dev ou PostgreSQL).
+"""Reset script — drops and recreates the database (SQLite dev or PostgreSQL).
 
-Usage :
+Usage:
     python -m scripts.reset_db                   # reset SQLite (dev)
-    python -m scripts.reset_db --seed            # reset + seed admin
-    python -m scripts.reset_db --force-postgres  # permet le reset sur PostgreSQL
+    python -m scripts.reset_db --seed            # reset + admin seed
+    python -m scripts.reset_db --force-postgres  # allow reset on PostgreSQL
     python -m scripts.reset_db --force-postgres --seed
 """
 
@@ -15,18 +15,18 @@ from apymix.config import get_settings
 
 
 async def reset_db(seed: bool = False, force_postgres: bool = False) -> None:
-    """Supprime et recrée les tables (SQLite ou PostgreSQL avec --force-postgres)."""
+    """Drop and recreate tables (SQLite or PostgreSQL with --force-postgres)."""
     settings = get_settings()
     is_sqlite = settings.database_url.startswith("sqlite")
 
     db_label = settings.database_url[:60] + ("…" if len(settings.database_url) > 60 else "")
-    print(f"🗄️  Base cible : {db_label}")
+    print(f"🗄️  Target database: {db_label}")
 
     if not is_sqlite and not force_postgres:
-        print("❌ Base PostgreSQL détectée. Utilise --force-postgres pour confirmer le reset.")
+        print("❌ PostgreSQL database detected. Use --force-postgres to confirm the reset.")
         return
 
-    # Import des modèles avant toute opération
+    # Import models before any operation
     from apymix.auth.models import User  # noqa: F401
     from apymix.auth.models import UserAccount  # noqa: F401
     from apymix.discovery import import_all_api_models
@@ -39,9 +39,9 @@ async def reset_db(seed: bool = False, force_postgres: bool = False) -> None:
         db_file = Path(db_path)
         if db_file.exists():
             db_file.unlink()
-            print(f"🗑️  Fichier supprimé : {db_file}")
+            print(f"🗑️  File deleted: {db_file}")
         else:
-            print(f"ℹ️  Pas de fichier à supprimer ({db_file})")
+            print(f"ℹ️  No file to delete ({db_file})")
     else:
         from apymix.db.session import _get_engine
         from sqlmodel import SQLModel
@@ -49,24 +49,24 @@ async def reset_db(seed: bool = False, force_postgres: bool = False) -> None:
         engine = _get_engine()
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.drop_all)
-        print("🗑️  Tables PostgreSQL supprimées")
+        print("🗑️  PostgreSQL tables dropped")
 
     await init_db()
-    print("✅ Base recréée")
+    print("✅ Database recreated")
 
     if seed:
         from apymix.scripts.db_init import seed_initial_data
         await seed_initial_data()
-        print("🌱 Seed complet (admin + APIs) terminé")
+        print("🌱 Full seed (admin + APIs) completed")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Reset la base de données")
-    parser.add_argument("--seed", action="store_true", help="Créer un admin après le reset")
+    parser = argparse.ArgumentParser(description="Reset the database")
+    parser.add_argument("--seed", action="store_true", help="Create an admin after the reset")
     parser.add_argument(
         "--force-postgres",
         action="store_true",
-        help="Autoriser le reset sur une base PostgreSQL (⚠️ destructif)",
+        help="Allow reset on a PostgreSQL database (⚠️ destructive)",
     )
     args = parser.parse_args()
 

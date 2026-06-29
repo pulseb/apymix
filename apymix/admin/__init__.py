@@ -1,4 +1,4 @@
-"""Back-office admin — SQLAdmin intégré à PAPI."""
+"""Admin back-office — SQLAdmin integrated into Apymix."""
 
 from apymix.admin.setup import setup_admin
 

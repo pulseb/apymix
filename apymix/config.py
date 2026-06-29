@@ -4,26 +4,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Configuration centralisée de l'application, chargée depuis les variables d'environnement."""
+    """Centralized application configuration, loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=(".env", ".env.local"),  # .env.local surcharge .env (jamais commité)
+        env_file=(".env", ".env.local"),  # .env.local overrides .env (never committed)
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    # Général
+    # General
     env: str = "development"
     debug: bool = False
 
-    # Base de données
+    # Database
     database_url: str = "sqlite+aiosqlite:///./dev.db"
 
     # JWT
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
     jwt_refresh_token_expire_days: int = 7
-    # jwt_secret est géré par papi.db.config_store (env var JWT_SECRET ou DB papi_config)
+    # jwt_secret is managed by apymix.db.config_store (env var JWT_SECRET or DB amx_config)
 
     # CORS
     cors_origins: str = "http://localhost:5173,http://localhost:8000,http://localhost:9000"
@@ -31,25 +31,25 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
 
-    # Backup S3 (Scaleway Object Storage ou tout S3-compatible)
+    # S3 backup (Scaleway Object Storage or any S3-compatible storage)
     s3_endpoint_url: str | None = None
-    """URL endpoint S3, ex: https://s3.fr-par.scw.cloud"""
+    """S3 endpoint URL, e.g. https://s3.fr-par.scw.cloud"""
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
     s3_bucket_name: str | None = None
-    """Nom du bucket S3 pour stocker les backups."""
+    """Name of the S3 bucket used to store backups."""
     s3_region: str = "fr-par"
 
     @property
     def backup_enabled(self) -> bool:
-        """True si la config S3 est complète (backup disponible)."""
+        """True if the S3 configuration is complete (backup available)."""
         return bool(self.s3_endpoint_url and self.s3_access_key_id and self.s3_secret_access_key and self.s3_bucket_name)
 
-    # Notifications email (Resend)
+    # Email notifications (Resend)
     resend_api_key: str | None = None
-    """Clé API Resend (https://resend.com). Si None, les emails ne sont pas envoyés."""
+    """Resend API key (https://resend.com). If None, emails are not sent."""
     resend_from_email: str = "noreply@pulsapps.fr"
-    """Adresse expéditrice des notifications (doit être vérifiée dans Resend)."""
+    """Sender address for notifications (must be verified in Resend)."""
 
     # Virtual host routing (host → front name)
     vhost_map: str = ""
@@ -70,8 +70,8 @@ class Settings(BaseSettings):
 
     # Dev / CI
     force_seed: bool = False
-    """Si True, réinitialise la BDD et rejoue le seed au démarrage.
-    Activé via variable d'env FORCE_SEED=true ou argument CLI --seed (voir app.py)."""
+    """If True, reset the database and replay the seed on startup.
+    Enabled via the FORCE_SEED=true environment variable or the --seed CLI argument (see app.py)."""
 
     @property
     def cors_origins_list(self) -> list[str]:
@@ -103,5 +103,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Singleton : charge la configuration une seule fois."""
+    """Singleton: load the configuration once."""
     return Settings()

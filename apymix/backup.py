@@ -1,15 +1,15 @@
-"""Backup et restore de la base de données.
+"""Database backup and restore.
 
-Stratégie :
-- Lecture de toutes les tables via SQLAlchemy (connection partagée avec l'app)
-- Sérialisation JSON + compression gzip
-- Upload/download vers un bucket S3-compatible (Scaleway Object Storage)
+Strategy:
+- Read all tables via SQLAlchemy (shared connection with the app)
+- JSON serialization + gzip compression
+- Upload/download to an S3-compatible bucket (Scaleway Object Storage)
 
-Pas de dépendance à pg_dump — fonctionne avec PostgreSQL et SQLite.
-Le fichier de backup peut être restauré dans n'importe quelle base cible,
-y compris SQLite local (recette / preprod).
+No dependency on pg_dump — works with PostgreSQL and SQLite.
+The backup file can be restored into any target database, including
+a local SQLite (staging / preprod).
 
-Format du fichier de backup :
+Backup file format:
     {
         "version": "1",
         "created_at": "2026-03-12T10:00:00+00:00",
@@ -38,11 +38,11 @@ BACKUP_KEY_PREFIX = "backups/"
 
 
 # ---------------------------------------------------------------------------
-# Sérialisation
+# Serialization
 # ---------------------------------------------------------------------------
 
 def _serialize_value(v: Any) -> Any:
-    """Rend une valeur JSON-serializable."""
+    """Make a value JSON-serializable."""
     import uuid
     if isinstance(v, uuid.UUID):
         return str(v)
@@ -56,25 +56,25 @@ def _serialize_value(v: Any) -> Any:
 
 
 def dump_to_bytes(backup_data: dict) -> bytes:
-    """Sérialise et compresse un dict de backup en bytes gzip."""
+    """Serialize and compress a backup dict into gzip bytes."""
     json_bytes = json.dumps(backup_data, ensure_ascii=False).encode("utf-8")
     return gzip.compress(json_bytes)
 
 
 def load_from_bytes(data: bytes) -> dict:
-    """Décompresse et désérialise un backup gzip → dict."""
+    """Decompress and deserialize a gzip backup → dict."""
     return json.loads(gzip.decompress(data).decode("utf-8"))
 
 
 # ---------------------------------------------------------------------------
-# Lecture de la DB (async)
+# Reading the DB (async)
 # ---------------------------------------------------------------------------
 
 async def create_backup(engine: AsyncEngine) -> dict:
-    """Lit toutes les tables via SQLAlchemy et retourne le dict de backup.
+    """Read all tables via SQLAlchemy and return the backup dict.
 
-    Utilise la connexion existante de l'app — pas besoin de pg_dump.
-    Fonctionne avec PostgreSQL et SQLite.
+    Uses the app's existing connection — no pg_dump needed.
+    Works with PostgreSQL and SQLite.
     """
     async with engine.connect() as conn:
 
@@ -91,11 +91,11 @@ async def create_backup(engine: AsyncEngine) -> dict:
                 {k: _serialize_value(v) for k, v in row.items()}
                 for row in rows
             ]
-            logger.debug("Backup table %s : %d lignes", table_name, len(tables[table_name]))
+            logger.debug("Backup table %s : %d row(s)", table_name, len(tables[table_name]))
 
     rows_total = sum(len(rows) for rows in tables.values())
     logger.info(
-        "Backup créé : %d tables, %d lignes au total",
+        "Backup created: %d tables, %d rows total",
         len(tables), rows_total,
     )
     return {
@@ -110,7 +110,7 @@ async def create_backup(engine: AsyncEngine) -> dict:
 # ---------------------------------------------------------------------------
 
 def _make_s3_client(settings):
-    """Crée un client boto3 configuré depuis les settings."""
+    """Create a boto3 client configured from settings."""
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
@@ -121,7 +121,7 @@ def _make_s3_client(settings):
 
 
 def _upload_sync(data: bytes, key: str, settings) -> None:
-    """Upload sync (appelé via asyncio.to_thread)."""
+    """Sync upload (called via asyncio.to_thread)."""
     client = _make_s3_client(settings)
     client.put_object(
         Bucket=settings.s3_bucket_name,
@@ -132,7 +132,7 @@ def _upload_sync(data: bytes, key: str, settings) -> None:
 
 
 def _list_sync(settings) -> list[dict]:
-    """Liste les backups disponibles (appelé via asyncio.to_thread)."""
+    """List available backups (called via asyncio.to_thread)."""
     client = _make_s3_client(settings)
     response = client.list_objects_v2(
         Bucket=settings.s3_bucket_name,
@@ -150,23 +150,23 @@ def _list_sync(settings) -> list[dict]:
 
 
 def _download_sync(key: str, settings) -> bytes:
-    """Télécharge un backup depuis S3 (appelé via asyncio.to_thread)."""
+    """Download a backup from S3 (called via asyncio.to_thread)."""
     client = _make_s3_client(settings)
     response = client.get_object(Bucket=settings.s3_bucket_name, Key=key)
     return response["Body"].read()
 
 
 # ---------------------------------------------------------------------------
-# Pipeline haut niveau (async)
+# High-level pipeline (async)
 # ---------------------------------------------------------------------------
 
 async def backup_and_upload(engine: AsyncEngine, settings) -> dict:
-    """Pipeline complet : dump DB → gzip → upload S3.
+    """Full pipeline: dump DB → gzip → upload to S3.
 
-    Retourne un dict avec la clé S3, la taille et le timestamp.
+    Returns a dict with the S3 key, size and timestamp.
     """
     if not settings.backup_enabled:
-        raise RuntimeError("Backup S3 non configuré (variables S3_* manquantes)")
+        raise RuntimeError("S3 backup not configured (missing S3_* variables)")
 
     backup_data = await create_backup(engine)
     data_bytes = dump_to_bytes(backup_data)
@@ -178,7 +178,7 @@ async def backup_and_upload(engine: AsyncEngine, settings) -> dict:
 
     rows_total = sum(len(rows) for rows in backup_data["tables"].values())
     logger.info(
-        "Backup uploadé : %s (%d tables, %d lignes, %.1f Ko)",
+        "Backup uploaded: %s (%d tables, %d rows, %.1f KB)",
         key, len(backup_data["tables"]), rows_total, len(data_bytes) / 1024,
     )
     return {
@@ -191,14 +191,14 @@ async def backup_and_upload(engine: AsyncEngine, settings) -> dict:
 
 
 async def list_backups(settings) -> list[dict]:
-    """Liste les backups disponibles dans S3."""
+    """List the backups available in S3."""
     if not settings.backup_enabled:
-        raise RuntimeError("Backup S3 non configuré (variables S3_* manquantes)")
+        raise RuntimeError("S3 backup not configured (missing S3_* variables)")
     return await asyncio.to_thread(_list_sync, settings)
 
 
 async def download_backup(key: str, settings) -> bytes:
-    """Télécharge un backup depuis S3 en bytes gzip."""
+    """Download a backup from S3 as gzip bytes."""
     if not settings.backup_enabled:
-        raise RuntimeError("Backup S3 non configuré (variables S3_* manquantes)")
+        raise RuntimeError("S3 backup not configured (missing S3_* variables)")
     return await asyncio.to_thread(_download_sync, key, settings)

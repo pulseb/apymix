@@ -1,276 +1,276 @@
-# User Stories — PAPI
+# User Stories — Apymix
 
 ---
 
-## EPIC-01 : Socle technique PAPI
+## EPIC-01 : Apymix Technical Core
 
-### US-001 : App factory et montage de sub-apps
+### US-001 : App factory and sub-app mounting
 
-**En tant que** développeur,
-**je souhaite** que l'application principale monte automatiquement les sub-apps enregistrées,
-**afin de** n'avoir qu'un seul point d'entrée pour toutes les APIs.
+**As a** developer,
+**I want** the main application to automatically mount registered sub-apps,
+**so that** I have a single entry point for all APIs.
 
-**Critères d'acceptation :**
-- [ ] L'app factory crée une instance FastAPI principale
-- [ ] Les sub-apps sont montées sur des préfixes configurables (ex : `/wedding`)
-- [ ] Le serveur démarre sans erreur avec `uvicorn papi.app:create_app --factory`
+**Acceptance criteria:**
+- [ ] The app factory creates a main FastAPI instance
+- [ ] Sub-apps are mounted under configurable prefixes (e.g. `/wedding`)
+- [ ] The server starts without error with `uvicorn papi.app:create_app --factory`
 
-**Estimation :** S
-**Epic :** EPIC-01
-
----
-
-### US-002 : OpenAPI par sub-app
-
-**En tant que** développeur,
-**je souhaite** que chaque sub-app expose son propre schéma OpenAPI,
-**afin de** documenter chaque API indépendamment.
-
-**Critères d'acceptation :**
-- [ ] Chaque sub-app a une page Swagger UI accessible (ex : `/wedding/docs`)
-- [ ] Chaque sub-app a un endpoint `/openapi.json` propre
-- [ ] Le schéma inclut le titre, la version et la description de l'API
-
-**Estimation :** XS
-**Epic :** EPIC-01
+**Estimation:** S
+**Epic:** EPIC-01
 
 ---
 
-### US-003 : Configuration par environnement
+### US-002 : Per-sub-app OpenAPI
 
-**En tant que** développeur,
-**je souhaite** charger la configuration depuis des variables d'environnement,
-**afin de** adapter le comportement entre dev et prod sans modifier le code.
+**As a** developer,
+**I want** each sub-app to expose its own OpenAPI schema,
+**so that** each API is documented independently.
 
-**Critères d'acceptation :**
-- [ ] La configuration est gérée via Pydantic Settings (`BaseSettings`)
-- [ ] Un fichier `.env` est supporté pour le développement local
-- [ ] Les paramètres clés sont configurables : `DATABASE_URL`, `JWT_SECRET`, `ENV`, `DEBUG`
+**Acceptance criteria:**
+- [ ] Each sub-app has an accessible Swagger UI page (e.g. `/wedding/docs`)
+- [ ] Each sub-app has its own `/openapi.json` endpoint
+- [ ] The schema includes the API's title, version, and description
 
-**Estimation :** S
-**Epic :** EPIC-01
-
----
-
-### US-004 : Abstraction base de données
-
-**En tant que** développeur,
-**je souhaite** utiliser SQLite en développement et PostgreSQL en production avec le même code,
-**afin de** simplifier le développement local.
-
-**Critères d'acceptation :**
-- [ ] SQLAlchemy 2.0 async est configuré avec session factory
-- [ ] Le moteur de BDD est déterminé par `DATABASE_URL`
-- [ ] Une dépendance FastAPI `get_db` fournit une session par requête
-- [ ] Les modèles SQLAlchemy fonctionnent sur les deux moteurs
-
-**Estimation :** M
-**Epic :** EPIC-01
+**Estimation:** XS
+**Epic:** EPIC-01
 
 ---
 
-### US-005 : Authentification JWT
+### US-003 : Environment-based configuration
 
-**En tant qu'** administrateur,
-**je souhaite** m'authentifier via JWT,
-**afin de** accéder aux fonctionnalités d'administration de manière sécurisée.
+**As a** developer,
+**I want** to load configuration from environment variables,
+**so that** I can adapt behavior between dev and prod without changing the code.
 
-**Critères d'acceptation :**
-- [ ] Un endpoint `POST /auth/login` accepte email + mot de passe et retourne un JWT
-- [ ] Un endpoint `POST /auth/refresh` permet de renouveler le token
-- [ ] Les routes protégées vérifient le JWT via un middleware / dépendance
-- [ ] Les mots de passe sont hashés (bcrypt ou argon2)
-- [ ] Le JWT a une durée de vie configurable
+**Acceptance criteria:**
+- [ ] Configuration is managed via Pydantic Settings (`BaseSettings`)
+- [ ] A `.env` file is supported for local development
+- [ ] Key settings are configurable: `DATABASE_URL`, `JWT_SECRET`, `ENV`, `DEBUG`
 
-**Estimation :** M
-**Epic :** EPIC-01
+**Estimation:** S
+**Epic:** EPIC-01
 
 ---
 
-### US-006 : Middleware partagés
+### US-004 : Database abstraction
 
-**En tant que** développeur,
-**je souhaite** que les middleware CORS, logging et gestion d'erreurs soient appliqués globalement,
-**afin de** ne pas les reconfigurer pour chaque API.
+**As a** developer,
+**I want** to use SQLite in development and PostgreSQL in production with the same code,
+**so that** local development stays simple.
 
-**Critères d'acceptation :**
-- [ ] CORS est configuré sur l'app principale (origines autorisées configurables)
-- [ ] Les requêtes sont loguées avec méthode, path, status et durée
-- [ ] Les exceptions non gérées retournent une réponse JSON standardisée
-- [ ] Les erreurs de validation Pydantic retournent un format cohérent
+**Acceptance criteria:**
+- [ ] SQLAlchemy 2.0 async is configured with a session factory
+- [ ] The database engine is determined by `DATABASE_URL`
+- [ ] A FastAPI `get_db` dependency provides a session per request
+- [ ] SQLAlchemy models work on both engines
 
-**Estimation :** S
-**Epic :** EPIC-01
-
----
-
-## EPIC-04 : Déploiement & Infrastructure
-
-### US-016 : Lancement local en une commande
-
-**En tant que** développeur,
-**je souhaite** lancer l'application avec une seule commande,
-**afin de** développer rapidement.
-
-**Critères d'acceptation :**
-- [ ] `uvicorn papi.app:create_app --factory --reload` démarre l'app avec SQLite
-- [ ] Un fichier `.env.example` documente les variables nécessaires
-- [ ] Le `README.md` contient les instructions de quickstart
-
-**Estimation :** S
-**Epic :** EPIC-04
+**Estimation:** M
+**Epic:** EPIC-01
 
 ---
 
-### US-017 : Déploiement Docker
+### US-005 : JWT authentication
 
-**En tant que** développeur,
-**je souhaite** déployer via Docker / docker-compose,
-**afin de** simplifier la mise en production.
+**As an** administrator,
+**I want** to authenticate via JWT,
+**so that** I can access administration features securely.
 
-**Critères d'acceptation :**
-- [ ] Un `Dockerfile` multi-stage produit une image optimisée
-- [ ] Un `docker-compose.yml` lance l'app + PostgreSQL
-- [ ] Les variables d'environnement sont documentées
-- [ ] L'image pèse moins de 200 Mo
+**Acceptance criteria:**
+- [ ] A `POST /auth/login` endpoint accepts email + password and returns a JWT
+- [ ] A `POST /auth/refresh` endpoint renews the token
+- [ ] Protected routes verify the JWT via middleware / dependency
+- [ ] Passwords are hashed (bcrypt or argon2)
+- [ ] The JWT has a configurable lifetime
 
-**Estimation :** M
-**Epic :** EPIC-04
-
----
-
-### US-018 : Migrations de base de données
-
-**En tant que** développeur,
-**je souhaite** que les migrations de schéma soient gérées automatiquement,
-**afin de** faire évoluer le modèle de données sans intervention manuelle.
-
-**Critères d'acceptation :**
-- [ ] Alembic est configuré et fonctionne avec SQLite et PostgreSQL
-- [ ] `alembic upgrade head` applique toutes les migrations
-- [ ] `alembic revision --autogenerate` détecte les changements de modèle
-- [ ] Les migrations sont versionnées dans le dépôt Git
-
-**Estimation :** M
-**Epic :** EPIC-04
+**Estimation:** M
+**Epic:** EPIC-01
 
 ---
 
-## EPIC-05 : Opérations admin & qualité
+### US-006 : Shared middleware
 
-### US-019 : Déclencher un seed API depuis le backend admin
+**As a** developer,
+**I want** CORS, logging, and error handling middleware to be applied globally,
+**so that** I don't have to reconfigure them for each API.
 
-**En tant qu'** administrateur,
-**je souhaite** lancer manuellement le seed d'une application métier,
-**afin de** réinitialiser rapidement les données de démo d'une API sans script manuel.
+**Acceptance criteria:**
+- [ ] CORS is configured on the main app (configurable allowed origins)
+- [ ] Requests are logged with method, path, status, and duration
+- [ ] Unhandled exceptions return a standardized JSON response
+- [ ] Pydantic validation errors return a consistent format
 
-**Critères d'acceptation :**
-- [ ] Un endpoint `GET /-/admin/seed` liste les APIs seedables
-- [ ] Un endpoint `POST /-/admin/seed/{api_name}` déclenche le seed ciblé
-- [ ] L'accès est réservé aux sessions admin authentifiées
-- [ ] La réponse indique si des données ont effectivement été insérées (`seeded: true/false`)
-
-**Estimation :** S
-**Epic :** EPIC-05
+**Estimation:** S
+**Epic:** EPIC-01
 
 ---
 
-### US-020 : Couverture pytest des routes système critiques
+## EPIC-04 : Deployment & Infrastructure
 
-**En tant que** développeur,
-**je souhaite** disposer de tests `pytest` pour les routes système sensibles,
-**afin de** sécuriser les évolutions backend.
+### US-016 : One-command local launch
 
-**Critères d'acceptation :**
-- [ ] Les routes de seed admin sont testées (auth, 404, succès)
-- [ ] Les tests s'exécutent localement via `uv run pytest`
-- [ ] Les tests n'écrivent pas dans la base de développement par défaut
+**As a** developer,
+**I want** to launch the application with a single command,
+**so that** I can develop quickly.
 
-**Estimation :** S
-**Epic :** EPIC-05
+**Acceptance criteria:**
+- [ ] `uvicorn papi.app:create_app --factory --reload` starts the app with SQLite
+- [ ] A `.env.example` file documents the required variables
+- [ ] The `README.md` contains quickstart instructions
 
----
-
-## EPIC-06 : Authentification fédérée (OIDC)
-
-### US-021 : Connexion admin via Google OIDC
-
-**En tant qu'** administrateur,
-**je souhaite** me connecter avec mon compte Google,
-**afin de** accéder au back-office sans gérer un mot de passe local supplémentaire.
-
-**Critères d'acceptation :**
-- [ ] Un endpoint de redirection OIDC est disponible (`/-/auth/oidc/google/login`)
-- [ ] Un callback OIDC valide l'identité et crée/met à jour l'utilisateur local
-- [ ] L'utilisateur connecté reçoit un JWT interne PAPI pour les routes protégées
-- [ ] L'accès admin reste conditionné au rôle `admin` côté base PAPI
-
-**Estimation :** M
-**Epic :** EPIC-06
+**Estimation:** S
+**Epic:** EPIC-04
 
 ---
 
-### US-022 : Ajouter GitHub comme provider OIDC secondaire
+### US-017 : Docker deployment
 
-**En tant que** développeur,
-**je souhaite** ajouter GitHub comme second provider OIDC,
-**afin de** offrir une alternative de connexion sans modifier l'architecture auth.
+**As a** developer,
+**I want** to deploy via Docker / docker-compose,
+**so that** production rollout is straightforward.
 
-**Critères d'acceptation :**
-- [ ] Le provider GitHub est activable par configuration (feature flag/env)
-- [ ] Le flux login/callback réutilise le même socle que Google
-- [ ] Les claims utiles (email, sub) sont normalisés dans le modèle utilisateur interne
+**Acceptance criteria:**
+- [ ] A multi-stage `Dockerfile` produces an optimized image
+- [ ] A `docker-compose.yml` launches the app + PostgreSQL
+- [ ] Environment variables are documented
+- [ ] The image weighs less than 200 MB
 
-**Estimation :** S
-**Epic :** EPIC-06
-
----
-
-## EPIC-07 : Images profilées par application
-
-### US-023 : Build Docker par profil applicatif
-
-**En tant que** développeur,
-**je souhaite** construire une image selon un profil (`all`, `eve`, `kif`),
-**afin de** déployer uniquement les apps nécessaires selon l'environnement.
-
-**Critères d'acceptation :**
-- [ ] Une commande de build accepte un profil (script ou argument standardisé)
-- [ ] Le profil `all` conserve le comportement actuel (toutes apps incluses)
-- [ ] Le profil `eve` inclut uniquement `eve-api` et le front `eve`
-- [ ] La documentation de build/deploy décrit clairement les profils disponibles
-
-**Estimation :** M
-**Epic :** EPIC-07
+**Estimation:** M
+**Epic:** EPIC-04
 
 ---
 
-### US-024 : Service mono-front sur la racine `/`
+### US-018 : Database migrations
 
-**En tant qu'** invité,
-**je souhaite** accéder à un front mono-app directement sur `/`,
-**afin de** éviter les préfixes d'URL dans un déploiement dédié.
+**As a** developer,
+**I want** schema migrations to be managed automatically,
+**so that** the data model can evolve without manual intervention.
 
-**Critères d'acceptation :**
-- [ ] En profil mono-front, le front actif est monté sur `/`
-- [ ] Les assets statiques et routes SPA/PWA fonctionnent sans préfixe
-- [ ] Les autres fronts ne sont pas montés dans ce profil
+**Acceptance criteria:**
+- [ ] Alembic is configured and works with both SQLite and PostgreSQL
+- [ ] `alembic upgrade head` applies all migrations
+- [ ] `alembic revision --autogenerate` detects model changes
+- [ ] Migrations are versioned in the Git repository
 
-**Estimation :** M
-**Epic :** EPIC-07
+**Estimation:** M
+**Epic:** EPIC-04
 
 ---
 
-### US-025 : Sécuriser le schéma HTTPS derrière reverse proxy
+## EPIC-05 : Admin Operations & Quality
 
-**En tant qu'** administrateur,
-**je souhaite** que l'admin UI serve toutes ses ressources en HTTPS,
-**afin de** éviter les alertes navigateur et le mixed content.
+### US-019 : Trigger an API seed from the admin backend
 
-**Critères d'acceptation :**
-- [ ] L'application interprète correctement `X-Forwarded-Proto` derrière le proxy de confiance
-- [ ] Les URLs générées pour SQLAdmin utilisent `https://` en production
-- [ ] Aucun asset admin n'est chargé en `http://` depuis le navigateur
+**As an** administrator,
+**I want** to manually launch the seed of a business application,
+**so that** I can quickly reset an API's demo data without a manual script.
 
-**Estimation :** S
-**Epic :** EPIC-07
+**Acceptance criteria:**
+- [ ] A `GET /-/admin/seed` endpoint lists seedable APIs
+- [ ] A `POST /-/admin/seed/{api_name}` endpoint triggers the targeted seed
+- [ ] Access is restricted to authenticated admin sessions
+- [ ] The response indicates whether data was actually inserted (`seeded: true/false`)
+
+**Estimation:** S
+**Epic:** EPIC-05
+
+---
+
+### US-020 : pytest coverage for critical system routes
+
+**As a** developer,
+**I want** `pytest` tests for sensitive system routes,
+**so that** backend evolutions stay safe.
+
+**Acceptance criteria:**
+- [ ] Admin seed routes are tested (auth, 404, success)
+- [ ] Tests run locally via `uv run pytest`
+- [ ] Tests do not write to the development database by default
+
+**Estimation:** S
+**Epic:** EPIC-05
+
+---
+
+## EPIC-06 : Federated Authentication (OIDC)
+
+### US-021 : Admin sign-in via Google OIDC
+
+**As an** administrator,
+**I want** to sign in with my Google account,
+**so that** I can access the back-office without managing an extra local password.
+
+**Acceptance criteria:**
+- [ ] An OIDC redirect endpoint is available (`/-/auth/oidc/google/login`)
+- [ ] An OIDC callback validates the identity and creates/updates the local user
+- [ ] The connected user receives an internal Apymix JWT for protected routes
+- [ ] Admin access still depends on the `admin` role on the Apymix side
+
+**Estimation:** M
+**Epic:** EPIC-06
+
+---
+
+### US-022 : Add GitHub as a secondary OIDC provider
+
+**As a** developer,
+**I want** to add GitHub as a second OIDC provider,
+**so that** I can offer a sign-in alternative without changing the auth architecture.
+
+**Acceptance criteria:**
+- [ ] The GitHub provider is toggleable via configuration (feature flag/env)
+- [ ] The login/callback flow reuses the same core as Google
+- [ ] Useful claims (email, sub) are normalized into the internal user model
+
+**Estimation:** S
+**Epic:** EPIC-06
+
+---
+
+## EPIC-07 : Per-Application Profiled Images
+
+### US-023 : Per-profile Docker build
+
+**As a** developer,
+**I want** to build an image per profile (`all`, `eve`, `kif`),
+**so that** I deploy only the apps needed for a given environment.
+
+**Acceptance criteria:**
+- [ ] A build command accepts a profile (script or standardized argument)
+- [ ] The `all` profile keeps the current behavior (all apps included)
+- [ ] The `eve` profile includes only `eve-api` and the `eve` frontend
+- [ ] The build/deploy documentation clearly describes the available profiles
+
+**Estimation:** M
+**Epic:** EPIC-07
+
+---
+
+### US-024 : Mono-front service at root `/`
+
+**As a** visitor,
+**I want** to access a mono-app frontend directly at `/`,
+**so that** I don't have to deal with URL prefixes in a dedicated deployment.
+
+**Acceptance criteria:**
+- [ ] In mono-front profile, the active frontend is mounted at `/`
+- [ ] Static assets and SPA/PWA routes work without a prefix
+- [ ] Other frontends are not mounted in this profile
+
+**Estimation:** M
+**Epic:** EPIC-07
+
+---
+
+### US-025 : Secure the HTTPS scheme behind a reverse proxy
+
+**As an** administrator,
+**I want** the admin UI to serve all its resources over HTTPS,
+**so that** we avoid browser warnings and mixed content.
+
+**Acceptance criteria:**
+- [ ] The application correctly interprets `X-Forwarded-Proto` behind the trusted proxy
+- [ ] URLs generated for SQLAdmin use `https://` in production
+- [ ] No admin asset is loaded over `http://` from the browser
+
+**Estimation:** S
+**Epic:** EPIC-07

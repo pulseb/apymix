@@ -1,4 +1,4 @@
-"""Authentification SQLAdmin — backend session-based."""
+"""SQLAdmin authentication — session-based backend."""
 
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
@@ -10,10 +10,10 @@ from apymix.auth.security import verify_password
 
 
 class AdminAuth(AuthenticationBackend):
-    """Backend d'authentification pour SQLAdmin.
+    """Authentication backend for SQLAdmin.
 
-    Utilise une session cookie (via itsdangerous) + vérification
-    email/password contre la table users.
+    Uses a session cookie (via itsdangerous) + email/password
+    verification against the users table.
     """
 
     def __init__(self, secret_key: str, engine: AsyncEngine) -> None:
@@ -21,7 +21,7 @@ class AdminAuth(AuthenticationBackend):
         self._engine = engine
 
     async def login(self, request: Request) -> bool:
-        """Vérifie les credentials et crée la session."""
+        """Verifies credentials and creates the session."""
         form = await request.form()
         email = form.get("username", "")
         password = form.get("password", "")
@@ -42,10 +42,10 @@ class AdminAuth(AuthenticationBackend):
         return False
 
     async def logout(self, request: Request) -> bool:
-        """Supprime la session."""
+        """Clears the session."""
         request.session.clear()
         return True
 
     async def authenticate(self, request: Request) -> bool:
-        """Vérifie si l'utilisateur est connecté (appelé à chaque requête admin)."""
+        """Checks whether the user is logged in (called on every admin request)."""
         return "user_id" in request.session

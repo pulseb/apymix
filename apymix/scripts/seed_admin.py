@@ -1,8 +1,8 @@
-"""Script de seed — crée le premier utilisateur admin en BDD.
+"""Seed script — creates the first admin user in the database.
 
-Usage :
+Usage:
     python -m scripts.seed_admin
-    python -m scripts.seed_admin --email admin@papi.local --password secret123
+    python -m scripts.seed_admin --email admin@apymix.local --password secret123
 """
 
 import argparse
@@ -10,7 +10,7 @@ import asyncio
 
 from sqlmodel import select
 
-# Import dynamique de tous les modèles (papi + APIs) pour SQLModel.metadata
+# Dynamic import of all models (apymix + APIs) for SQLModel.metadata
 from apymix.auth.models import User, UserAccount
 from apymix.auth.security import get_password_hash
 from apymix.db.session import get_db, init_db
@@ -18,7 +18,7 @@ from apymix.discovery import import_all_api_models
 
 
 async def seed_admin(email: str, password: str) -> None:
-    """Crée un utilisateur admin s'il n'existe pas déjà."""
+    """Create an admin user if it does not already exist."""
     import_all_api_models()
     await init_db()
 
@@ -27,7 +27,7 @@ async def seed_admin(email: str, password: str) -> None:
         existing = result.scalar_one_or_none()
 
         if existing:
-            print(f"⚠️  L'utilisateur '{email}' existe déjà (id={existing.id})")
+            print(f"⚠️  User '{email}' already exists (id={existing.id})")
             return
 
         user = User(
@@ -36,7 +36,7 @@ async def seed_admin(email: str, password: str) -> None:
             status="active",
         )
         db.add(user)
-        await db.flush()  # obtenir user.id
+        await db.flush()  # obtain user.id
 
         account = UserAccount(
             user_id=user.id,
@@ -48,13 +48,13 @@ async def seed_admin(email: str, password: str) -> None:
         await db.commit()
         await db.refresh(user)
 
-        print(f"✅ Admin créé : {email} (id={user.id})")
+        print(f"✅ Admin created: {email} (id={user.id})")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Créer un utilisateur admin")
-    parser.add_argument("--email", default="admin@papi.local", help="Email de l'admin")
-    parser.add_argument("--password", default="admin", help="Mot de passe de l'admin")
+    parser = argparse.ArgumentParser(description="Create an admin user")
+    parser.add_argument("--email", default="admin@apymix.local", help="Admin email")
+    parser.add_argument("--password", default="admin", help="Admin password")
     args = parser.parse_args()
 
     asyncio.run(seed_admin(args.email, args.password))

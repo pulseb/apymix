@@ -22,22 +22,22 @@ def _get_engine():
         settings = get_settings()
         url = settings.database_url or _FALLBACK_URL
 
-        # Valide l'URL avant de créer le moteur — repli sur SQLite mémoire si invalide
+        # Validate the URL before creating the engine — fall back to in-memory SQLite if invalid
         try:
             from sqlalchemy import make_url
 
             make_url(url)
         except Exception:
             logging.getLogger(__name__).warning(
-                "DATABASE_URL invalide ou vide (%r) — repli sur SQLite mémoire", url
+                "DATABASE_URL invalid or empty (%r) — falling back to in-memory SQLite", url
             )
             url = _FALLBACK_URL
 
         _using_fallback = url == _FALLBACK_URL
         _effective_db_url = url
 
-        # Normalise les schemes postgres obsolètes → postgresql+asyncpg
-        # postgres:// et postgres+asyncpg:// ne sont plus reconnus par SQLAlchemy 2.x
+        # Normalize legacy postgres schemes → postgresql+asyncpg
+        # postgres:// and postgres+asyncpg:// are no longer recognized by SQLAlchemy 2.x
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif url.startswith("postgres+asyncpg://"):
@@ -70,20 +70,20 @@ def _get_engine():
 
 
 def get_db_info() -> dict:
-    """Retourne des infos sur la connexion DB (sans exposer les credentials)."""
+    """Returns info about the DB connection (without exposing credentials)."""
     from sqlalchemy import make_url
 
-    backend = "non initialisé"
-    masked_url = "non initialisé"
+    backend = "not initialized"
+    masked_url = "not initialized"
     if _effective_db_url:
         try:
             parsed = make_url(_effective_db_url)
             backend = parsed.get_backend_name()
-            # Masquer le mot de passe
+            # Mask the password
             masked_url = parsed.render_as_string(hide_password=True)
         except Exception:
-            backend = "inconnu"
-            masked_url = "(illisible)"
+            backend = "unknown"
+            masked_url = "(unreadable)"
 
     return {
         "backend": backend,
@@ -100,17 +100,17 @@ def _get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dépendance FastAPI : fournit une session BDD par requête."""
+    """FastAPI dependency: provides a DB session per request."""
     session_factory = _get_session_factory()
     async with session_factory() as session:
         yield session
 
 
 async def init_db() -> None:
-    """Crée les tables (dev uniquement — en prod, utiliser Alembic)."""
+    """Creates the tables (dev only — in prod, use Alembic)."""
     engine = _get_engine()
     async with engine.begin() as conn:
-        # Active les foreign keys pour SQLite
+        # Enable foreign keys for SQLite
         if get_settings().database_url.startswith("sqlite"):
             await conn.execute(
                 __import__("sqlalchemy").text("PRAGMA foreign_keys = ON")

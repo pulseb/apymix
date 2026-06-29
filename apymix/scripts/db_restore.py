@@ -1,33 +1,33 @@
-"""Script CLI de restore de la base de données.
+"""Database restore CLI script.
 
-Usage :
-    # Lister les backups disponibles sur S3
+Usage:
+    # List available backups on S3
     uv run scripts/db_restore.py --list
 
-    # Restaurer le backup le plus récent depuis S3 vers la DB cible
+    # Restore the most recent backup from S3 to the target DB
     uv run scripts/db_restore.py --source latest
 
-    # Restaurer une clé S3 spécifique
+    # Restore a specific S3 key
     uv run scripts/db_restore.py --source backups/20260312_100000.json.gz
 
-    # Restaurer depuis un fichier local
+    # Restore from a local file
     uv run scripts/db_restore.py --source ./backup.json.gz
 
-    # Restaurer vers une autre DB (ex: SQLite local pour recette)
-    uv run scripts/db_restore.py --source latest --target-db-url sqlite+aiosqlite:///./recette.db
+    # Restore to another DB (e.g. local SQLite for staging)
+    uv run scripts/db_restore.py --source latest --target-db-url sqlite+aiosqlite:///./staging.db
 
-    # Restaurer vers un autre PostgreSQL
+    # Restore to another PostgreSQL
     uv run scripts/db_restore.py --source latest \\
         --target-db-url postgresql+asyncpg://user:pass@host/dbname
 
-Notes :
-    - Sans --target-db-url, la DB cible est DATABASE_URL depuis .env
-    - Les tables sont créées si elles n'existent pas (via SQLModel.metadata)
-    - Les données existantes sont supprimées avant restauration
-    - Opération idempotente : peut être relancée sans risque sur une DB vide
+Notes:
+    - Without --target-db-url, the target DB is DATABASE_URL from .env
+    - Tables are created if they do not exist (via SQLModel.metadata)
+    - Existing data is deleted before restore
+    - Idempotent operation: safe to re-run on an empty DB
 
-Cas d'usage principal (preprod/recette) :
-    DATABASE_URL=sqlite+aiosqlite:///./recette.db \\
+Main use case (preprod/staging):
+    DATABASE_URL=sqlite+aiosqlite:///./staging.db \\
     uv run scripts/db_restore.py --source latest
 """
 
@@ -38,7 +38,7 @@ import logging
 import sys
 from pathlib import Path
 
-# Ajouter la racine du projet au path pour les imports papi.*
+# Add the project root to the path for apymix.* imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import inspect, text
@@ -53,17 +53,17 @@ logger = logging.getLogger(__name__)
 
 
 def _import_all_models() -> None:
-    """Importe tous les modules models pour peupler SQLModel.metadata.
+    """Import all models modules to populate SQLModel.metadata.
 
-    Nécessaire pour que create_all() crée les bonnes tables dans la DB cible.
-    Ajouter ici chaque nouveau `models.py` créé dans papi/ ou apis/*.
+    Required so that create_all() creates the right tables in the target DB.
+    Add each new `models.py` created in apymix/ or apis/* here.
     """
     modules = [
-        "papi.db.models",
-        "papi.apps.models",
-        "papi.auth.models",
+        "apymix.db.models",
+        "apymix.apps.models",
+        "apymix.auth.models",
     ]
-    # Auto-découverte des APIs
+    # Auto-discovery of APIs
     apis_dir = Path(__file__).resolve().parent.parent / "apis"
     if apis_dir.is_dir():
         for api_dir in sorted(apis_dir.iterdir()):
@@ -74,28 +74,28 @@ def _import_all_models() -> None:
     for module in modules:
         try:
             importlib.import_module(module)
-            logger.debug("Modèles importés : %s", module)
+            logger.debug("Models imported: %s", module)
         except ImportError as e:
-            logger.warning("Impossible d'importer %s : %s", module, e)
+            logger.warning("Could not import %s: %s", module, e)
 
 
 async def restore(backup_data: dict, target_db_url: str) -> None:
-    """Restaure un backup dans la DB cible.
+    """Restore a backup into the target DB.
 
-    - Crée les tables manquantes (via SQLModel.metadata)
-    - Vide les tables existantes dans l'ordre inverse (respect FK)
-    - Insère toutes les lignes du backup
+    - Creates missing tables (via SQLModel.metadata)
+    - Empties existing tables in reverse order (respects FK)
+    - Inserts all rows from the backup
     """
     engine = create_async_engine(target_db_url, echo=False)
 
     _import_all_models()
 
     async with engine.begin() as conn:
-        # Créer les tables si elles n'existent pas
+        # Create tables if they do not exist
         await conn.run_sync(SQLModel.metadata.create_all)
-        logger.info("Tables vérifiées / créées")
+        logger.info("Tables verified / created")
 
-        # Désactiver les FK le temps du restore
+        # Disable FKs for the duration of the restore
         def get_table_names(sync_conn):
             return inspect(sync_conn).get_table_names()
 
@@ -110,52 +110,52 @@ async def restore(backup_data: dict, target_db_url: str) -> None:
         else:
             await conn.execute(text("SET session_replication_role = 'replica'"))
 
-        # Vider les tables dans l'ordre inverse (FK)
+        # Empty tables in reverse order (FK)
         tables_in_backup = list(backup_data["tables"].keys())
         for table_name in reversed(tables_in_backup):
             if table_name in existing_tables:
                 await conn.execute(text(f'DELETE FROM "{table_name}"'))
-                logger.debug("Table vidée : %s", table_name)
+                logger.debug("Table emptied: %s", table_name)
 
-        # Insérer les données
+        # Insert data
         total_inserted = 0
         for table_name, rows in backup_data["tables"].items():
             if not rows:
-                logger.info("Table %s : vide (0 lignes)", table_name)
+                logger.info("Table %s: empty (0 rows)", table_name)
                 continue
             if table_name not in existing_tables:
-                logger.warning("Table %s absente de la DB cible — ignorée", table_name)
+                logger.warning("Table %s missing from target DB — skipped", table_name)
                 continue
 
             columns_in_backup = list(rows[0].keys())
 
-            # Colonnes réellement présentes dans la table cible
+            # Columns actually present in the target table
             target_columns = await conn.run_sync(get_column_names, table_name)
 
-            # Colonnes du backup absentes de la cible (colonne supprimée)
+            # Backup columns missing from the target (dropped column)
             dropped = [c for c in columns_in_backup if c not in target_columns]
             if dropped:
                 logger.warning(
-                    "Table %s : colonne(s) ignorée(s) car absente(s) de la cible : %s",
+                    "Table %s: column(s) skipped because missing from target: %s",
                     table_name, dropped,
                 )
 
-            # Colonnes de la cible absentes du backup (colonne ajoutée) → NULL/défaut
+            # Target columns missing from the backup (added column) → NULL/default
             added = [c for c in target_columns if c not in columns_in_backup]
             if added:
                 logger.info(
-                    "Table %s : colonne(s) non présentes dans le backup → valeur NULL/défaut : %s",
+                    "Table %s: column(s) not present in backup → NULL/default value: %s",
                     table_name, added,
                 )
 
-            # On n'insère que les colonnes communes
+            # Only insert common columns
             columns = [c for c in columns_in_backup if c in target_columns]
             if not columns:
-                logger.warning("Table %s : aucune colonne commune — ignorée", table_name)
+                logger.warning("Table %s: no common columns — skipped", table_name)
                 continue
 
-            # Filtrer les rows pour ne garder que les colonnes communes
-            # SQLite ne gère pas les dict/list nativement → sérialiser en JSON string
+            # Filter rows to keep only common columns
+            # SQLite does not handle dict/list natively → serialize as JSON string
             def _coerce(v):
                 if is_sqlite and isinstance(v, (dict, list)):
                     import json as _json
@@ -169,17 +169,17 @@ async def restore(backup_data: dict, target_db_url: str) -> None:
             query = text(f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})')
 
             await conn.execute(query, filtered_rows)
-            logger.info("Table %s : %d lignes insérées", table_name, len(rows))
+            logger.info("Table %s: %d rows inserted", table_name, len(rows))
             total_inserted += len(rows)
 
-        # Réactiver les FK
+        # Re-enable FKs
         if is_sqlite:
             await conn.execute(text("PRAGMA foreign_keys = ON"))
         else:
             await conn.execute(text("SET session_replication_role = 'origin'"))
 
     await engine.dispose()
-    logger.info("✅ Restore terminé : %d lignes au total", total_inserted)
+    logger.info("✅ Restore completed: %d total rows", total_inserted)
 
 
 async def main(args: argparse.Namespace) -> None:
@@ -188,11 +188,11 @@ async def main(args: argparse.Namespace) -> None:
     # --- Listing ---
     if args.list:
         if not settings.backup_enabled:
-            logger.error("❌ S3 non configuré — impossible de lister les backups")
+            logger.error("❌ S3 not configured — cannot list backups")
             sys.exit(1)
         backups = await list_backups(settings)
         if not backups:
-            logger.info("Aucun backup disponible")
+            logger.info("No backup available")
             return
         for b in backups:
             size_kb = b["size_bytes"] / 1024
@@ -202,32 +202,32 @@ async def main(args: argparse.Namespace) -> None:
     # --- Resolve source ---
     source = args.source
     if not source:
-        logger.error("Fournir --source <clé S3 | 'latest' | fichier local> ou --list")
+        logger.error("Provide --source <S3 key | 'latest' | local file> or --list")
         sys.exit(1)
 
-    # Charger les données brutes
+    # Load raw data
     if Path(source).exists():
-        logger.info("Chargement depuis fichier local : %s", source)
+        logger.info("Loading from local file: %s", source)
         raw = Path(source).read_bytes()
     else:
         if not settings.backup_enabled:
-            logger.error("❌ S3 non configuré — impossible de télécharger %s", source)
+            logger.error("❌ S3 not configured — cannot download %s", source)
             sys.exit(1)
         if source == "latest":
             backups = await list_backups(settings)
             if not backups:
-                logger.error("Aucun backup disponible sur S3")
+                logger.error("No backup available on S3")
                 sys.exit(1)
             source = backups[0]["key"]
-            logger.info("Backup le plus récent : %s", source)
-        logger.info("Téléchargement depuis S3 : %s", source)
+            logger.info("Most recent backup: %s", source)
+        logger.info("Downloading from S3: %s", source)
         raw = await download_backup(source, settings)
 
     backup_data = load_from_bytes(raw)
     tables = backup_data.get("tables", {})
     rows_total = sum(len(r) for r in tables.values())
     logger.info(
-        "Backup chargé : v%s créé le %s — %d tables, %d lignes",
+        "Backup loaded: v%s created on %s — %d tables, %d rows",
         backup_data.get("version", "?"),
         backup_data.get("created_at", "?"),
         len(tables), rows_total,
@@ -235,32 +235,32 @@ async def main(args: argparse.Namespace) -> None:
 
     # --- Target DB ---
     target_db_url = args.target_db_url or settings.database_url
-    logger.info("DB cible : %s", target_db_url.split("@")[-1] if "@" in target_db_url else target_db_url)
+    logger.info("Target DB: %s", target_db_url.split("@")[-1] if "@" in target_db_url else target_db_url)
 
     await restore(backup_data, target_db_url)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Restore de la base de données PAPI depuis un backup",
+        description="Restore the Apymix database from a backup",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
     parser.add_argument(
         "--source",
         metavar="SOURCE",
-        help="Clé S3 (ex: backups/20260312_100000.json.gz), 'latest', ou chemin local",
+        help="S3 key (e.g. backups/20260312_100000.json.gz), 'latest', or local path",
     )
     parser.add_argument(
         "--target-db-url",
         metavar="URL",
-        help="URL de la DB cible (défaut: DATABASE_URL depuis .env). "
-             "Exemples: sqlite+aiosqlite:///./recette.db, postgresql+asyncpg://user:pass@host/db",
+        help="Target DB URL (default: DATABASE_URL from .env). "
+             "Examples: sqlite+aiosqlite:///./staging.db, postgresql+asyncpg://user:pass@host/db",
     )
     parser.add_argument(
         "--list",
         action="store_true",
-        help="Lister les backups disponibles sur S3 et quitter",
+        help="List available backups on S3 and quit",
     )
     args = parser.parse_args()
     asyncio.run(main(args))

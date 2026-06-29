@@ -1,7 +1,7 @@
-"""Routes admin pour déclencher les seeds des APIs.
+"""Admin routes to trigger the API seeds.
 
-Montées sur ``/-/admin/seed/`` — utilitaires JSON pour dev/scripts.
-L'interface UI officielle est l'action SQLAdmin sur Applications.
+Mounted on ``/-/admin/seed/`` — JSON utilities for dev/scripts.
+The official UI is the SQLAdmin action on Applications.
 """
 
 import logging
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/-/admin/seed", tags=["admin-seed"])
 
 
 def _discover_seedable_apis() -> list[str]:
-    """Liste les APIs qui ont un module seed disponible (via amx.yaml)."""
+    """Lists the APIs that have an available seed module (via amx.yaml)."""
     api_entries, _ = discover_projects(_get_workspace_root())
     result = []
     for _route, _app, config in api_entries:
@@ -36,7 +36,7 @@ def _discover_seedable_apis() -> list[str]:
 
 @router.get("", response_class=JSONResponse)
 async def list_seeds(request: Request):
-    """Liste les APIs avec seed disponible."""
+    """Lists the APIs with an available seed."""
     apis = _discover_seedable_apis()
     return {"apis": apis}
 
@@ -47,19 +47,19 @@ async def trigger_seed(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Déclenche le seed d'une API spécifique."""
+    """Triggers the seed of a specific API."""
     available = _discover_seedable_apis()
     if api_name not in available:
-        return JSONResponse({"detail": f"API '{api_name}' n'a pas de seed"}, status_code=404)
+        return JSONResponse({"detail": f"API '{api_name}' has no seed"}, status_code=404)
 
     try:
         seeded = await seed_api(api_name, db)
         if seeded:
             await db.commit()
-            logger.info("🌱 Seed '%s' déclenché via admin", api_name)
+            logger.info("🌱 Seed '%s' triggered via admin", api_name)
             return {"status": "ok", "api": api_name, "seeded": True}
         else:
-            return {"status": "ok", "api": api_name, "seeded": False, "message": "Données déjà présentes"}
+            return {"status": "ok", "api": api_name, "seeded": False, "message": "Data already present"}
     except Exception as e:
-        logger.exception("Erreur seed '%s' via admin", api_name)
+        logger.exception("Error in seed '%s' via admin", api_name)
         return JSONResponse({"detail": str(e)}, status_code=500)

@@ -1,12 +1,12 @@
-"""Middleware de redirection HTTP piloté par la table papi_redirects.
+"""HTTP redirect middleware driven by the amx_redirects table.
 
-Les règles sont chargées depuis la DB au démarrage et mises en cache en mémoire.
-Un rechargement est déclenché toutes les 60 secondes (lazy, au prochain hit).
+Rules are loaded from the DB at startup and cached in memory.
+A reload is triggered every 60 seconds (lazily, on the next hit).
 
-Priorité d'évaluation d'une requête entrante :
-    1. host + path_prefix correspondants
-    2. host seul (path_prefix vide)
-    3. path_prefix seul (host vide)
+Evaluation priority of an incoming request:
+    1. matching host + path_prefix
+    2. host only (empty path_prefix)
+    3. path_prefix only (empty host)
 """
 
 import logging
@@ -19,12 +19,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL = 60  # secondes
+_CACHE_TTL = 60  # seconds
 _TABLE_PREFIX: str = os.environ.get("AMX_TABLE_PREFIX", "amx_")
 
 
 class RedirectMiddleware:
-    """ASGI middleware : évalue les règles de redirection avant le routeur FastAPI."""
+    """ASGI middleware: evaluates redirect rules before the FastAPI router."""
 
     def __init__(self, app: Any, db_url: str) -> None:
         self.app = app
@@ -33,7 +33,7 @@ class RedirectMiddleware:
         self._loaded_at: float = 0.0
 
     async def _load_rules(self) -> None:
-        """Charge les règles actives depuis la DB."""
+        """Loads the active rules from the DB."""
         try:
             engine = create_async_engine(self.db_url, echo=False)
             async with engine.connect() as conn:
@@ -55,7 +55,7 @@ class RedirectMiddleware:
             logger.warning("Could not load redirect rules: %s", exc)
 
     def _match(self, host: str, path: str) -> dict | None:
-        """Retourne la première règle qui correspond à (host, path), ou None."""
+        """Returns the first rule that matches (host, path), or None."""
         for rule in self._rules:
             r_host = rule.get("host") or ""
             r_prefix = rule.get("path_prefix") or ""
@@ -70,7 +70,7 @@ class RedirectMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Rechargement TTL (lazy)
+        # TTL reload (lazy)
         if time.monotonic() - self._loaded_at > _CACHE_TTL:
             await self._load_rules()
 

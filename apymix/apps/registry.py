@@ -1,8 +1,8 @@
-"""Registre d'applications — synchronise les apps découvertes avec la DB.
+"""Application registry — synchronizes discovered apps with the DB.
 
-Lorsqu'une nouvelle AppEntry de type API est insérée pour la première fois,
-le registre déclenche automatiquement le seed de cette API (via
-``apis/<name>/seed.py``) pour peupler ses tables avec des données initiales.
+When a new AppEntry of type API is inserted for the first time, the registry
+automatically triggers the seed of that API (via ``apis/<name>/seed.py``)
+to populate its tables with initial data.
 """
 
 import logging
@@ -19,30 +19,30 @@ async def sync_app_registry(
     session: AsyncSession,
     discovered: list[dict],
 ) -> dict[str, dict]:
-    """Synchronise le registre des apps avec les dossiers découverts.
+    """Synchronizes the app registry with the discovered folders.
 
-    Pour chaque app dans ``discovered`` :
-    - Si elle n'existe pas en DB → INSERT (status=active)
-      → si c'est une API, son seed est déclenché automatiquement
-    - Si elle existe en 'unavailable' → repasse en 'active' (elle est revenue)
-    - Si elle existe en 'active' ou 'disabled' → met à jour last_seen_at
+    For each app in ``discovered``:
+    - If it does not exist in the DB → INSERT (status=active)
+      → if it is an API, its seed is automatically triggered
+    - If it exists with status 'unavailable' → switch back to 'active' (it has returned)
+    - If it exists with status 'active' or 'disabled' → update last_seen_at
 
-    Pour chaque app en DB non présente dans ``discovered`` :
-    - Si status != 'unavailable' → passe en 'unavailable'
+    For each DB app not present in ``discovered``:
+    - If status != 'unavailable' → switch to 'unavailable'
 
     Args:
-        session: Session DB async.
-        discovered: Liste de dicts avec keys: name, app_type, prefix, description, version.
+        session: Async DB session.
+        discovered: List of dicts with keys: name, app_type, prefix, description, version.
 
     Returns:
-        Dict {app_name: {"status": ..., "docs_enabled": ...}} après sync.
+        Dict {app_name: {"status": ..., "docs_enabled": ...}} after sync.
     """
     from apymix.db.models import _utcnow
     now = _utcnow()
     discovered_names = {d["name"] for d in discovered}
-    new_api_names: list[str] = []  # APIs nouvellement insérées → à seeder
+    new_api_names: list[str] = []  # Newly inserted APIs → to be seeded
 
-    # Charger toutes les apps existantes
+    # Load all existing apps
     result = await session.execute(select(AppEntry))
     existing: dict[str, AppEntry] = {app.name: app for app in result.scalars().all()}
 
@@ -60,7 +60,7 @@ async def sync_app_registry(
 
             if entry.status == AppStatus.unavailable.value:
                 entry.status = AppStatus.active.value
-                logger.info("App '%s' de retour → active", name)
+                logger.info("App '%s' is back → active", name)
         else:
             entry = AppEntry(
                 name=name,
@@ -72,9 +72,9 @@ async def sync_app_registry(
                 last_seen_at=now,
             )
             session.add(entry)
-            logger.info("Nouvelle app enregistrée : %s (%s)", name, app_info["app_type"])
+            logger.info("New app registered: %s (%s)", name, app_info["app_type"])
 
-            # Marquer les nouvelles APIs pour auto-seed
+            # Mark new APIs for auto-seed
             if app_info["app_type"] == "api":
                 new_api_names.append(name)
 
@@ -84,15 +84,15 @@ async def sync_app_registry(
             if entry.status == AppStatus.unavailable.value:
                 # Already unavailable from a previous run — purge it
                 await session.delete(entry)
-                logger.warning("App '%s' toujours introuvable → supprimée du registre", name)
+                logger.warning("App '%s' still missing → removed from registry", name)
             else:
                 entry.status = AppStatus.unavailable.value
                 entry.updated_at = now
-                logger.warning("App '%s' introuvable → unavailable", name)
+                logger.warning("App '%s' not found → unavailable", name)
 
     await session.commit()
 
-    # --- Auto-seed des nouvelles APIs ---
+    # --- Auto-seed new APIs ---
     if new_api_names:
         await _seed_new_apis(session, new_api_names)
 
@@ -105,10 +105,10 @@ async def sync_app_registry(
 
 
 async def _seed_new_apis(session: AsyncSession, api_names: list[str]) -> None:
-    """Déclenche le seed de chaque API nouvellement enregistrée.
+    """Triggers the seed of each newly registered API.
 
-    Utilise l'auto-discovery de ``scripts.db_init.seed_api`` pour appeler
-    le ``apis/<name>/seed.py`` correspondant.
+    Uses the auto-discovery from ``scripts.db_init.seed_api`` to call the
+    corresponding ``apis/<name>/seed.py``.
     """
     from apymix.scripts.db_init import seed_api
 
@@ -117,6 +117,6 @@ async def _seed_new_apis(session: AsyncSession, api_names: list[str]) -> None:
             seeded = await seed_api(name, session)
             if seeded:
                 await session.commit()
-                logger.info("🌱 Auto-seed API '%s' terminé", name)
+                logger.info("🌱 Auto-seed API '%s' completed", name)
         except Exception:
-            logger.exception("Erreur auto-seed API '%s'", name)
+            logger.exception("Auto-seed error for API '%s'", name)

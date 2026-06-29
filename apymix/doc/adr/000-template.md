@@ -1,33 +1,33 @@
 # ADR-000 : Template
 
-**Statut :** Template (ne pas modifier)
-**Date :** YYYY-MM-DD
+**Status:** Template (do not modify)
+**Date:** YYYY-MM-DD
 
-## Contexte
+## Context
 
-Décrivez le contexte et les forces en jeu. Quel problème essayons-nous de résoudre ? Quelles sont les contraintes ?
+Describe the context and the forces at play. What problem are we trying to solve? What are the constraints?
 
-## Options envisagées
+## Considered options
 
-### Option A : [Titre]
-- **Avantages :** ...
-- **Inconvénients :** ...
+### Option A : [Title]
+- **Pros:** ...
+- **Cons:** ...
 
-### Option B : [Titre]
-- **Avantages :** ...
-- **Inconvénients :** ...
+### Option B : [Title]
+- **Pros:** ...
+- **Cons:** ...
 
-## Décision
+## Decision
 
-Quelle option avons-nous choisie et pourquoi ?
+Which option did we choose and why?
 
-## Conséquences
+## Consequences
 
-### Positives
+### Positive
 - ...
 
-### Négatives
+### Negative
 - ...
 
-### Risques
+### Risks
 - ...

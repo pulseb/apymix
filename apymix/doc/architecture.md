@@ -1,12 +1,12 @@
-# Architecture technique — PAPI
+# Technical Architecture — Apymix
 
-## Vue d'ensemble
+## Overview
 
-PAPI suit une architecture **modulaire en couches** avec **découverte automatique** des APIs :
+Apymix follows a **layered, modular architecture** with **automatic discovery** of APIs:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   Clients (navigateur)               │
+│                   Clients (browser)                  │
 └──────────────────────┬──────────────────────────────┘
                        │ HTTPS
 ┌──────────────────────▼──────────────────────────────┐
@@ -21,7 +21,7 @@ PAPI suit une architecture **modulaire en couches** avec **découverte automatiq
 │  └─────────────┴─────────────┴─────────────────┘    │
 │                                                      │
 │  ┌ ─ ─ ─ ─ ─ ─ ─ ─ Auto-Discovery ─ ─ ─ ─ ─ ─ ┐  │
-│  │ scan apis/ → mount sub-apps → serve fronts/   │  │
+│  │  scan amx.yaml → mount sub-apps + fronts      │  │
 │  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │
 │                                                      │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
@@ -42,212 +42,184 @@ PAPI suit une architecture **modulaire en couches** avec **découverte automatiq
 └─────────────────────────────────────────────────────┘
 ```
 
-## Principe fondamental : découplage total
+## Core principle: full decoupling
 
-Le module `papi/` est **complètement agnostique** des APIs métier et des frontends :
+The `apymix/` module is **completely agnostic** of business APIs and frontends:
 
 ```
-papi/     →  Ne connaît AUCUNE API métier. Zéro import depuis apis/ ou fronts/.
-apis/     →  Importe depuis papi/ (auth, db, config). Indépendant des autres APIs.
-fronts/   →  Consomme les APIs via HTTP. Aucune dépendance Python vers papi/ ou apis/.
+apymix/   →  Knows NO business API. Zero imports from any API or frontend.
+*-api/    →  Imports from apymix/ (auth, db, config). Independent of other APIs.
+*-ui/     →  Consumes APIs over HTTP. No Python dependency on apymix/ or APIs.
 ```
 
-> Cela permet de transformer `papi/` en package pip réutilisable pour d'autres projets.
+> This makes it possible to turn `apymix/` into a reusable pip package for other projects.
 
-## Routage par préfixes
+## Routing by prefix
 
-Le routage utilise des préfixes pour éviter toute collision entre les composants :
+Routing uses prefixes to prevent collisions between components:
 
-| Préfixe | Usage | Exemples |
+| Prefix | Usage | Examples |
 |---------|-------|----------|
-| `/-/` | Routes système PAPI | `/-/docs`, `/-/admin`, `/-/health`, `/-/auth/*` |
-| `/api/` | APIs métier | `/api/eve/events`, `/api/eve/events/{slug}/rsvps` |
-| `/{name}` | Frontends (StaticFiles) | `/eve` (SPA Vue.js/Quasar) |
-| `/` | Root minimaliste | Retourne `{"message": "PulseApps is running"}` (pas d'info sensible) |
+| `/-/` | Apymix system routes | `/-/docs`, `/-/admin`, `/-/health`, `/-/auth/*` |
+| `/api/` | Business APIs | `/api/eve/events`, `/api/eve/events/{slug}/rsvps` |
+| `/{name}` | Frontends (StaticFiles) | `/eve` (Vue.js/Quasar SPA) |
+| `/` | Minimal root | Returns `{"message": "PulseApps is running"}` (no sensitive info) |
 
-> **Le dashboard ASCII art** (liens vers docs, admin, health) est sur `/-/` (non indexé).
-> La page `/` est volontairement minimaliste pour ne pas exposer d'informations à un visiteur non autorisé.
+> The **ASCII art dashboard** (links to docs, admin, health) lives at `/-/` (not indexed).
+> The `/` page is intentionally minimal so it doesn't leak information to unauthenticated visitors.
 
-### Constantes (dans `app.py`) :
+### Constants (in `app.py`):
 ```python
-PAPI_PREFIX = "/-"     # Routes système
-API_PREFIX = "/api"    # APIs métier
+AMX_ROUTES_PREFIX = "/-"     # System routes
+API_PREFIX = "/api"    # Business APIs
 ```
 
-## Composants
+## Components
 
-### 1. Module `papi/` (cœur technique)
+### 1. The `apymix/` module (technical core)
 
-Le module technique réutilisable, potentiellement open-sourceable.
+The reusable technical module, potentially open-sourceable.
 
-| Sous-module | Responsabilité |
+| Sub-module | Responsibility |
 |-------------|----------------|
-| `app.py` | App factory : crée l'app FastAPI, **découvre et monte** les sub-apps automatiquement, enregistre les middleware |
-| `discovery.py` | Scanner de `apis/` et `fronts/` : détecte les sub-apps et les fichiers statiques à monter |
-| `apps/` | **Registre d'applications** : modèle `AppEntry` (table `papi_apps`) et logique de synchronisation au démarrage. Permet l'activation/désactivation des apps sans supprimer le code ni les données |
-| `auth/` | Authentification JWT + token statique, gestion des tokens, dépendances de protection des routes |
-| `admin/` | Back-office SQLAdmin monté sur `/-/admin` (gestion CRUD auto-générée, auth par session). UUIDs raccourcis dans l'affichage (1ère section) |
-| `db/` | Session factory, base model SQLModel, gestion du cycle de vie des connexions |
-| `config/` | Chargement de la configuration depuis les variables d'environnement (via Pydantic Settings) |
-| `middleware/` | CORS, logging structuré, gestion globale des erreurs |
-| `utils/` | Utilitaires partagés (pagination, réponses standardisées, etc.) |
+| `app.py` | App factory: creates the FastAPI app, **discovers and mounts** sub-apps automatically, registers middleware |
+| `discovery.py` | Scanner that walks the workspace for `amx.yaml` files: detects sub-apps and static frontends to mount |
+| `apps/` | **Application registry**: `AppEntry` model (`amx_apps` table) and startup sync logic. Lets you enable/disable apps without deleting code or data |
+| `auth/` | JWT authentication + static token, token management, route protection dependencies |
+| `admin/` | SQLAdmin back-office mounted at `/-/admin` (auto-generated CRUD, session-based auth). Shortened UUIDs in the display (1st section) |
+| `db/` | Session factory, SQLModel base model, connection lifecycle management |
+| `config.py` | Configuration loading from environment variables (via Pydantic Settings) |
+| `middleware/` | CORS, structured logging, global error handling |
+| `spa_static.py` | Static file serving for built SPAs |
 
-### 2. Sub-apps `apis/` — Découverte automatique
+### 2. Sub-apps — Automatic discovery
 
-Chaque dossier dans `apis/` est une **FastAPI sub-app** indépendante, **découverte et montée automatiquement** par l'app factory.
+Each `amx.yaml` at the workspace root that declares `type: api` is an **independent FastAPI sub-app**, **discovered and mounted automatically** by the app factory.
 
-#### Convention de découverte
+#### Discovery convention
 
-L'app factory scanne le dossier `apis/` au démarrage. Pour qu'un dossier soit reconnu comme une API, il doit :
-
-1. Contenir un fichier **`app.py`** exportant une instance FastAPI nommée **`app`**
-2. *(Optionnel)* Contenir un fichier **`manifest.yaml`** pour les métadonnées
-
-```
-apis/
-├── eve/
-│   ├── manifest.yaml      # ← Métadonnées (optionnel)
-│   ├── app.py              # ← OBLIGATOIRE : exporte `app` (FastAPI)
-│   ├── models.py
-│   ├── schemas.py
-│   ├── routes.py
-│   └── services.py
-└── another_api/
-    ├── app.py              # ← Découverte automatique
-    └── ...
-```
-
-#### Fichier `manifest.yaml` (optionnel)
-
-Permet de surcharger les métadonnées inférées par convention :
+The app factory walks the workspace at startup. For a project to be recognized as an API, its `amx.yaml` must declare:
 
 ```yaml
-# apis/eve/manifest.yaml
-name: "Eve"
-prefix: "/eve"          # Défaut : nom du dossier (monté sous /api/eve)
-description: "API de gestion des événements et RSVP"
-version: "1.0.0"
-enabled: true               # Permet de désactiver sans supprimer
+name: Eve-API
+route: /eve
+type: api
+module: eve_api        # Python module exposing `app: FastAPI`
+table_prefix: eve_
+version: 1.0.0
+enabled: true
 ```
 
-Si absent, les valeurs sont inférées :
-- `prefix` → nom du dossier (ex : `apis/eve/` → `/eve`, monté sous `/api/eve`)
-- `name` → nom du dossier capitalisé
-- `enabled` → `true`
-
-#### Exemple de sub-app
+#### Example sub-app
 
 ```python
-# apis/eve/app.py
+# eve-api/eve_api/app.py
 from fastapi import FastAPI
 
 app = FastAPI(
     title="Eve API",
     version="1.0.0",
-    description="API de gestion des événements et RSVP"
+    description="API for event management and RSVP"
 )
 
 from .routes import router
 app.include_router(router)
 ```
 
-### 3. Frontends `fronts/` — Fichiers statiques
+### 3. Frontends — Static files
 
-Applications frontend indépendantes. Chaque frontend est **buildé** (HTML/CSS/JS statiques) puis servi automatiquement.
+Independent frontend applications. Each frontend is **built** (static HTML/CSS/JS) then served automatically.
 
-#### Comment sont servis les fichiers statiques ?
+#### How are static files served?
 
-C'est **Starlette** (la fondation de FastAPI) qui fournit `StaticFiles`, un composant ASGI dédié au service de fichiers statiques. Comme FastAPI **est** Starlette, utiliser `StaticFiles` via FastAPI n'ajoute aucun overhead.
+**Starlette** (the foundation of FastAPI) provides `StaticFiles`, an ASGI component dedicated to serving static files. Since FastAPI **is** Starlette, using `StaticFiles` through FastAPI adds no overhead.
 
-**Stratégie retenue :**
+**Chosen strategy:**
 
-| Environnement | Méthode | Avantage |
+| Environment | Method | Advantage |
 |---------------|---------|----------|
-| **Dev** | `StaticFiles` ou `DevProxy` (reverse proxy ASGI vers quasar dev) | Simple, tout-en-un, un seul processus |
-| **Prod** | Reverse proxy (Traefik/Nginx/Caddy) sert les fichiers statiques, proxy les APIs | Performant, cache, compression, HTTPS |
+| **Dev** | `StaticFiles` or `DevProxy` (ASGI reverse proxy to `quasar dev`) | Simple, all-in-one, single process |
+| **Prod** | Reverse proxy (Traefik/Nginx/Caddy) serves static files, proxies APIs | Performant, cache, compression, HTTPS |
 
-#### Convention pour les fronts
+#### Frontend convention
 
 ```
-fronts/
-├── eve/
-│   ├── dist/               # ← Build Quasar (quasar build → dist/)
-│   │   ├── index.html
-│   │   ├── css/
-│   │   └── js/
-│   ├── src/                # ← Source Vue.js/Quasar (non servi)
-│   ├── package.json
-│   └── manifest.yaml       # ← Optionnel : métadonnées
-└── another_front/
-    └── dist/
+eve-ui/
+├── amx.yaml            # route, type: static, dist_dir, etc.
+├── dist/               # Quasar build output (quasar build → dist/)
+│   ├── index.html
+│   ├── css/
+│   └── js/
+├── src/                # Vue.js/Quasar source (not served)
+└── package.json
 ```
 
-### 4. Base de données
+### 4. Database
 
-**Stratégie dual-engine** via SQLModel (basé sur SQLAlchemy 2.0) :
+**Dual-engine strategy** via SQLModel (built on SQLAlchemy 2.0):
 
 ```python
-# Déterminé par la configuration
+# Determined by configuration
 if settings.env == "development":
     DATABASE_URL = "sqlite+aiosqlite:///./dev.db"
 else:
     DATABASE_URL = "postgresql+asyncpg://user:pass@host/dbname"
 ```
 
-- **Modèles unifiés** : déclarés une seule fois via SQLModel (`table=True` pour l'ORM, héritage pour les schémas)
-- **Migrations** : Alembic gère les migrations pour les deux moteurs
-- **Sessions** : gestion via dependency injection FastAPI (`Depends(get_db)`)
+- **Unified models**: declared once via SQLModel (`table=True` for ORM, inheritance for schemas)
+- **Migrations**: Alembic handles migrations for both engines
+- **Sessions**: managed via FastAPI dependency injection (`Depends(get_db)`)
 
-## Flux de données
+## Data flow
 
-### Requête API typique
+### Typical API request
 
 ```
 Client → Reverse Proxy → FastAPI Main → Middleware (CORS, Auth) → Sub-App Router → Service → DB → Response
 ```
 
-### Flux de découverte au démarrage
+### Discovery flow at startup
 
 ```
-1. create_app() configure FastAPI, middleware, auth, admin
-2. uvicorn lance le lifespan :
-   a. init_db() crée les tables (dev mode)
-   b. seed_initial_data() (scripts/db_init.py) :
-      - _seed_default_admin() crée admin si table users vide
-      - _seed_default_eve() crée événement + RSVPs si table events vide
-   c. _sync_registry() :
-      - discovery.py scanne apis/ et fronts/ → liste des apps découvertes
-      - sync_app_registry() synchronise la table papi_apps
-      - Montage des APIs actives sous /api/{name}
-      - Montage des fronts actifs sous /{name} si dist/ existe (StaticFiles)
-3. Serveur prêt
+1. create_app() configures FastAPI, middleware, auth, admin
+2. uvicorn runs the lifespan:
+   a. init_db() creates the tables (dev mode)
+   b. seed_initial_data() (scripts/db_init.py):
+      - _seed_default_admin() creates admin if users table is empty
+      - _seed_default_eve() creates event + RSVPs if events table is empty
+   c. _sync_registry():
+      - discovery.py scans the workspace for amx.yaml files → list of discovered apps
+      - sync_app_registry() synchronizes the amx_apps table
+      - Mounting of active APIs under /api/{name}
+      - Mounting of active frontends under /{name} if dist/ exists (StaticFiles)
+3. Server ready
 ```
 
-### Flux d'authentification
+### Authentication flow
 
 ```
-Mode JWT (login interactif) :
+JWT mode (interactive login):
 1. POST /-/auth/login { email, password }
-2. Vérification credentials → Génération JWT (access + refresh)
-3. Client stocke le JWT
-4. Requêtes suivantes : Header "Authorization: Bearer <jwt>"
-5. Middleware vérifie le JWT → injecte l'utilisateur dans le contexte
+2. Verify credentials → Generate JWT (access + refresh)
+3. Client stores the JWT
+4. Subsequent requests: Header "Authorization: Bearer <jwt>"
+5. Middleware verifies the JWT → injects the user into the context
 
-Mode api_token (intégrations simples) :
-1. POST /-/auth/me/token (authentifié) → génère un token statique unique
-2. Client stocke le token
-3. Requêtes suivantes : Header "Authorization: Bearer <api_token>"
-4. Si le Bearer n'est pas un JWT valide, le système cherche un User avec ce api_token
+api_token mode (simple integrations):
+1. POST /-/auth/me/token (authenticated) → generates a unique static token
+2. Client stores the token
+3. Subsequent requests: Header "Authorization: Bearer <api_token>"
+4. If the Bearer is not a valid JWT, the system looks up a User with this api_token
 ```
 
-> Les deux modes utilisent le même header `Authorization: Bearer`. La détection est automatique.
+> Both modes use the same `Authorization: Bearer` header. Detection is automatic.
 
-## Déploiement
+## Deployment
 
-### Développement
+### Development
 
 ```bash
-uv run uvicorn papi.app:app --reload --port 8000
+uv run uvicorn apymix.app:app --reload --port 8000
 ```
 
 ### Production (Docker)
@@ -255,7 +227,7 @@ uv run uvicorn papi.app:app --reload --port 8000
 ```yaml
 # docker-compose.yml
 services:
-  papi:
+  apymix:
     build: .
     ports:
       - "8000:8000"
@@ -271,23 +243,23 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=papi
-      - POSTGRES_USER=papi
+      - POSTGRES_DB=apymix
+      - POSTGRES_USER=apymix
       - POSTGRES_PASSWORD=...
 
 volumes:
   pgdata:
 ```
 
-## Conventions techniques
+## Technical conventions
 
-- **Async everywhere** : toutes les opérations I/O sont asynchrones
-- **Dependency Injection** : via le système `Depends()` de FastAPI
-- **Validation** : Pydantic v2 (via SQLModel) pour toutes les entrées/sorties
-- **Modèles unifiés** : SQLModel pour ORM + schéma en un seul modèle (voir ADR-002)
-- **Découverte automatique** : convention `app.py` + `manifest.yaml` optionnel (voir ADR-003)
-- **Registre d'apps** : table `papi_apps` synchronisée à chaque démarrage ; gestion `active` / `disabled` / `unavailable`
-- **Monitoring** : endpoint `GET /-/apps` expose le registre (APIs et fronts avec leur statut)
-- **Docs** : documentation Swagger accessible sur `/-/docs`
-- **Erreurs** : réponses standardisées avec codes HTTP appropriés
-- **Logging** : structuré (JSON en prod, lisible en dev)
+- **Async everywhere**: all I/O operations are asynchronous
+- **Dependency Injection**: via FastAPI's `Depends()` system
+- **Validation**: Pydantic v2 (via SQLModel) for all inputs/outputs
+- **Unified models**: SQLModel for ORM + schema in a single model (see ADR-002)
+- **Automatic discovery**: `amx.yaml` convention per project at the workspace root
+- **App registry**: `amx_apps` table synchronized on every startup; supports `active` / `disabled` / `unavailable` states
+- **Monitoring**: `GET /-/apps` endpoint exposes the registry (APIs and fronts with their status)
+- **Docs**: Swagger documentation available at `/-/docs`
+- **Errors**: standardized responses with appropriate HTTP codes
+- **Logging**: structured (JSON in prod, human-readable in dev)
